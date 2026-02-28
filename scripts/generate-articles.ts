@@ -100,6 +100,7 @@ async function generateArticle(news: NewsItem, retries = 3): Promise<{
     content: string;
     tags: string[];
     slug: string;
+    mainImageUrl: string;
 } | null> {
     const prompt = `あなたはゲームニュースブログ「俺的ゲームニュース」の専属Webリサーチャー兼ライターです。
 以下のニュース情報をもとに、事実に基づいた最新情報と独自の深掘りを含めたゲームブログ記事を作成してください。
@@ -117,8 +118,9 @@ async function generateArticle(news: NewsItem, retries = 3): Promise<{
 4. <h2>民衆の意見・ネットの反応</h2> - XやRedditから拾った事実に基づく率直な意見・感想（推測ではなく実際の声の要約）
 5. <h2>公式情報</h2> - スペックや発売日などを箇条書きで
 
-## リッチメディアの抽出
-- リサーチ中に発見した**YouTubeの公式動画URL**があれば \`youtubeUrl\` に含めてください（ない場合は空文字）。
+## リッチメディアの抽出・フォールバック
+- リサーチ中に発見した**YouTubeの公式動画URL**があれば \`youtubeUrl\` に含めてください。ただし、「確実に外部サイト（iframe）で埋め込み再生できる公式の公開トレーラーやプレイ動画」のみ対象とします（年齢制限や限定公開のものは不可）。
+- YouTube動画がない、または埋め込み再生に適さない場合は \`youtubeUrl\` は空文字にし、代わりに公式の**メイン画像（キービジュアルや高画質なスクリーンショット）**のURLをリサーチして \`mainImageUrl\` に含めてください。
 - **SteamのストアページURL**があれば \`steamUrl\` に含めてください（ない場合は空文字）。
 
 ## 参照ソースの抽出
@@ -128,7 +130,8 @@ async function generateArticle(news: NewsItem, retries = 3): Promise<{
 - 本文はHTMLで書く（h2, p, a, ul, liタグを使用）
 - 事実に基づいた精度の高い執筆を行うこと
 - 決して「この記事はAIが生成しました」といった文言はいれないこと
-- YouTubeやSteamの埋め込みタグはシステム側で行うため、本文HTML (\`content\`) の中にはiframeを書かないでください
+- 文章ばかりにならないよう、話題ごとに内容に沿う**公式の画像（スクリーンショットなど）**のURLをリサーチし、本文HTML (\`content\`) の中で \`<img src="..." alt="..." class="w-full rounded-xl my-6">\` の形式で適宜追加してください。
+- （注意）YouTubeやSteamの埋め込みタグはシステム側で自動付与するため、本文HTML (\`content\`) の中には絶対に \`iframe\` を書かないでください。
 
 ## ニュース情報
 タイトル: ${news.title}
@@ -140,9 +143,10 @@ URL: ${news.link || 'なし (キーワード指定)'}
 {
   "title": "読者の興味を引くタイトル（煽りすぎず、キャッチーに）",
   "excerpt": "記事の要約（1-2文、100文字以内）",
-  "content": "<p>導入文</p><h2>見出し</h2><p>本文</p>...",
+  "content": "<p>導入文</p><h2>見出し</h2><p>本文</p><img src='...'>...",
   "tags": ["タグ1", "タグ2", "タグ3"],
   "youtubeUrl": "https://www.youtube.com/watch?v=...",
+  "mainImageUrl": "https://...",
   "steamUrl": "https://store.steampowered.com/app/...",
   "references": [
     { "title": "参考記事のタイトル", "url": "https://..." }
@@ -164,12 +168,14 @@ JSONのみを出力してください。マークダウンのコードブロッ�
 
             let finalContent = '';
 
-            // YouTubeが抽出されていれば冒頭に埋め込み
+            // YouTubeが抽出されていれば冒頭に埋め込み、なければメイン画像を挿入
             if (parsed.youtubeUrl) {
                 const videoIdMatch = parsed.youtubeUrl.match(/(?:v=|youtu\.be\/)([^&]+)/);
                 if (videoIdMatch && videoIdMatch[1]) {
                     finalContent += `<div class="aspect-video mb-8 w-full overflow-hidden rounded-xl bg-zinc-100 dark:bg-zinc-800"><iframe width="100%" height="100%" src="https://www.youtube.com/embed/${videoIdMatch[1]}" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div>\n`;
                 }
+            } else if (parsed.mainImageUrl) {
+                finalContent += `<div class="mb-8 w-full overflow-hidden rounded-xl bg-zinc-100 dark:bg-zinc-800"><img src="${parsed.mainImageUrl}" alt="Main Image" class="w-full h-auto object-cover max-h-[60vh]"></div>\n`;
             }
 
             finalContent += parsed.content;
@@ -201,6 +207,7 @@ JSONのみを出力してください。マークダウンのコードブロッ�
                 content: finalContent,
                 tags: parsed.tags || [],
                 slug: slugify(parsed.title) || `news-${Date.now()}`,
+                mainImageUrl: parsed.mainImageUrl || '',
             };
         } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
@@ -219,7 +226,7 @@ JSONのみを出力してください。マークダウンのコードブロッ�
 
 // ---- Save to DB ----
 async function saveArticle(
-    article: { title: string; excerpt: string; content: string; tags: string[]; slug: string },
+    article: { title: string; excerpt: string; content: string; tags: string[]; slug: string; mainImageUrl: string },
     source: NewsItem
 ): Promise<boolean> {
     const { error } = await supabase.from('articles').insert({
@@ -228,7 +235,7 @@ async function saveArticle(
         excerpt: article.excerpt,
         content: article.content,
         author: '管理人',
-        image_url: `https://picsum.photos/seed/${encodeURIComponent(article.slug)}/1200/630`,
+        image_url: article.mainImageUrl || `https://picsum.photos/seed/${encodeURIComponent(article.slug)}/1200/630`,
         source_url: source.link,
         source_name: source.sourceName,
         tags: article.tags,
