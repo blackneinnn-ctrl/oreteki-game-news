@@ -121,6 +121,9 @@ async function generateArticle(news: NewsItem, retries = 3): Promise<{
 - リサーチ中に発見した**YouTubeの公式動画URL**があれば \`youtubeUrl\` に含めてください（ない場合は空文字）。
 - **SteamのストアページURL**があれば \`steamUrl\` に含めてください（ない場合は空文字）。
 
+## 参照ソースの抽出
+- リサーチに利用した情報ソース（元のニュース記事やReddit、公式Xなど）をすべて \`references\` 配列に含めてください。
+
 ## ルール
 - 本文はHTMLで書く（h2, p, a, ul, liタグを使用）
 - 事実に基づいた精度の高い執筆を行うこと
@@ -130,6 +133,7 @@ async function generateArticle(news: NewsItem, retries = 3): Promise<{
 ## ニュース情報
 タイトル: ${news.title}
 ソース: ${news.sourceName}
+URL: ${news.link}
 概要: ${news.summary.substring(0, 500)}
 
 ## 出力形式（JSON）
@@ -139,7 +143,10 @@ async function generateArticle(news: NewsItem, retries = 3): Promise<{
   "content": "<p>導入文</p><h2>見出し</h2><p>本文</p>...",
   "tags": ["タグ1", "タグ2", "タグ3"],
   "youtubeUrl": "https://www.youtube.com/watch?v=...",
-  "steamUrl": "https://store.steampowered.com/app/..."
+  "steamUrl": "https://store.steampowered.com/app/...",
+  "references": [
+    { "title": "参考記事のタイトル", "url": "https://..." }
+  ]
 }
 
 JSONのみを出力してください。マークダウンのコードブロックは不要です。`;
@@ -173,6 +180,19 @@ JSONのみを出力してください。マークダウンのコードブロッ�
                 if (appIdMatch && appIdMatch[1]) {
                     finalContent += `\n<div class="mt-8"><iframe src="https://store.steampowered.com/widget/${appIdMatch[1]}/" frameborder="0" width="100%" height="190"></iframe></div>`;
                 }
+            }
+
+            // 参考ソースを末尾に追加
+            if (parsed.references && Array.isArray(parsed.references) && parsed.references.length > 0) {
+                finalContent += `\n<div class="mt-12 pt-6 border-t border-zinc-200 dark:border-zinc-800">`;
+                finalContent += `<h3 class="text-lg font-bold mb-4">参考元</h3>`;
+                finalContent += `<ul class="space-y-2 text-sm text-zinc-500 dark:text-zinc-400">`;
+                for (const ref of parsed.references) {
+                    if (ref.title && ref.url) {
+                        finalContent += `<li>・ <a href="${ref.url}" target="_blank" rel="noopener noreferrer" class="hover:text-amber-500 hover:underline transition-colors">${ref.title}</a></li>`;
+                    }
+                }
+                finalContent += `</ul></div>`;
             }
 
             return {
