@@ -93,6 +93,53 @@ async function isDuplicate(sourceUrl: string): Promise<boolean> {
     return (data?.length ?? 0) > 0;
 }
 
+// ---- Validation Helpers ----
+async function isUrlValid(url: string, isImage = false): Promise<boolean> {
+    try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+        let res = await fetch(url, { method: 'HEAD', signal: controller.signal });
+        clearTimeout(timeoutId);
+
+        if (res.ok) {
+            if (isImage) {
+                const contentType = res.headers.get('content-type');
+                if (contentType && !contentType.startsWith('image/')) return false;
+            }
+            return true;
+        }
+
+        const controller2 = new AbortController();
+        const timeoutId2 = setTimeout(() => controller2.abort(), 5000);
+        res = await fetch(url, { method: 'GET', headers: { Range: 'bytes=0-100' }, signal: controller2.signal });
+        clearTimeout(timeoutId2);
+
+        if (res.ok || res.status === 206) {
+            if (isImage) {
+                const contentType = res.headers.get('content-type');
+                if (contentType && !contentType.startsWith('image/')) return false;
+            }
+            return true;
+        }
+        return false;
+    } catch {
+        return false;
+    }
+}
+
+async function isYouTubeValid(url: string): Promise<boolean> {
+    try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
+        const res = await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`, { signal: controller.signal });
+        clearTimeout(timeoutId);
+        return res.ok;
+    } catch {
+        return false;
+    }
+}
+
 // ---- Generate article with AI (with retry) ----
 async function generateArticle(news: NewsItem, retries = 3): Promise<{
     title: string;
@@ -132,6 +179,7 @@ async function generateArticle(news: NewsItem, retries = 3): Promise<{
 - 決して「この記事はAIが生成しました」といった文言はいれないこと
 - 文章ばかりにならないよう、話題ごとに内容に沿う**公式の画像（スクリーンショットなど）**のURLをリサーチし、本文HTML (\`content\`) の中で \`<img src="..." alt="..." class="w-full rounded-xl my-6">\` の形式で適宜追加してください。
 - （注意）YouTubeやSteamの埋め込みタグはシステム側で自動付与するため、本文HTML (\`content\`) の中には絶対に \`iframe\` を書かないでください。
+- （超重要）指定する全ての画像URLおよび動画URLは、必ず「現在アクセス可能で実在する公式リンク」を記載してください。架空のURL（ハルシネーション）やリンク切れのURLは絶対に使用しないでください。確証がない場合は空文字にしてください。
 
 ## ニュース情報
 タイトル: ${news.title}
@@ -165,6 +213,40 @@ JSONのみを出力してください。マークダウンのコードブロッ�
             const text = response.text?.trim() || '';
             const jsonStr = text.replace(/^```json?\n?/i, '').replace(/\n?```$/i, '').trim();
             const parsed = JSON.parse(jsonStr);
+
+            // リッチメディアのURL検証
+            if (parsed.youtubeUrl) {
+                const isValid = await isYouTubeValid(parsed.youtubeUrl);
+                if (!isValid) {
+                    console.log(`  ⚠️ YouTube動画が無効または非公開です: ${parsed.youtubeUrl}`);
+                    parsed.youtubeUrl = '';
+                }
+            }
+            if (parsed.mainImageUrl) {
+                const isValid = await isUrlValid(parsed.mainImageUrl, true);
+                if (!isValid) {
+                    console.log(`  ⚠️ メイン画像URLが無効です: ${parsed.mainImageUrl}`);
+                    parsed.mainImageUrl = '';
+                }
+            }
+
+            // 記事内の画像URL検証
+            if (parsed.content) {
+                const imgRegex = /<img[^>]+src=["']([^"']+)["'][^>]*>/g;
+                const invalidImgs: string[] = [];
+                const imgMatches = [...parsed.content.matchAll(imgRegex)];
+                for (const m of imgMatches) {
+                    const src = m[1];
+                    const isValid = await isUrlValid(src, true);
+                    if (!isValid) {
+                        console.log(`  ⚠️ 記事内画像URLが無効のため除外します: ${src}`);
+                        invalidImgs.push(m[0]);
+                    }
+                }
+                for (const invalidImg of invalidImgs) {
+                    parsed.content = parsed.content.replace(invalidImg, '');
+                }
+            }
 
             let finalContent = '';
 
