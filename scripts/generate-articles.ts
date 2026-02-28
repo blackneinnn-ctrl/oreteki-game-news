@@ -94,12 +94,18 @@ async function isDuplicate(sourceUrl: string): Promise<boolean> {
 }
 
 // ---- Validation Helpers ----
+const FETCH_HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+    'Accept-Language': 'ja,en-US;q=0.9,en;q=0.8'
+};
+
 async function isUrlValid(url: string, isImage = false): Promise<boolean> {
     try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-        let res = await fetch(url, { method: 'HEAD', signal: controller.signal });
+        let res = await fetch(url, { method: 'HEAD', headers: FETCH_HEADERS, signal: controller.signal });
         clearTimeout(timeoutId);
 
         if (res.ok) {
@@ -112,7 +118,7 @@ async function isUrlValid(url: string, isImage = false): Promise<boolean> {
 
         const controller2 = new AbortController();
         const timeoutId2 = setTimeout(() => controller2.abort(), 5000);
-        res = await fetch(url, { method: 'GET', headers: { Range: 'bytes=0-100' }, signal: controller2.signal });
+        res = await fetch(url, { method: 'GET', headers: { ...FETCH_HEADERS, Range: 'bytes=0-100' }, signal: controller2.signal });
         clearTimeout(timeoutId2);
 
         if (res.ok || res.status === 206) {
@@ -168,7 +174,7 @@ async function generateArticle(news: NewsItem, retries = 3): Promise<{
 ## リッチメディアの抽出・フォールバック
 - リサーチ中に発見した**YouTubeの公式動画URL**があれば \`youtubeUrl\` に含めてください。「確実に外部サイト（iframe）で埋め込み再生できる公式動画」のみ対象とします（年齢制限や限定公開のものは不可）。公式トレーラーがなければ、ティザー映像やPV（プロモーションビデオ）、実機プレイ映像など、公式が公開している何らかの関連動画を諦めずに探して設定してください。
 - どうしても見つからない場合のみ \`youtubeUrl\` は空文字にし、代わりに公式の**メイン画像（キービジュアルや高画質なスクリーンショット）**のURLをリサーチして \`mainImageUrl\` に含めてください。
-- **SteamのストアページURL**があれば \`steamUrl\` に含めてください（ない場合は空文字）。
+- **SteamのストアページURL**があれば \`steamUrl\` に含めてください。ただし、リサーチ元の情報内に「明確にそのゲーム本編のSteamストアへのリンク」が記載されている場合のみ抽出し、検索して適当なURLを推測することは**絶対にやめてください**（全く別のゲームのURLを出力する事故を防ぐため）。少しでも不確かな場合は必ず空文字にしてください。
 
 ## 参照ソースの抽出
 - リサーチに利用した情報ソース（元のニュース記事やReddit、公式Xなど）をすべて \`references\` 配列に含めてください。
@@ -179,7 +185,7 @@ async function generateArticle(news: NewsItem, retries = 3): Promise<{
 - 決して「この記事はAIが生成しました」といった文言はいれないこと
 - 文章ばかりにならないよう、話題ごとに内容に沿う**公式の画像（スクリーンショットなど）**のURLをリサーチし、本文HTML (\`content\`) の中で \`<img src="..." alt="..." class="w-full rounded-xl my-6">\` の形式で適宜追加してください。1つの情報元に画像がなくても諦めず、指定された全てのソース（国内外メディア、公式Xなど）を徹底的に辿って、必ず何らかの公式画像を見つけ出して挿入してください。
 - （注意）YouTubeやSteamの埋め込みタグはシステム側で自動付与するため、本文HTML (\`content\`) の中には絶対に \`iframe\` を書かないでください。
-- （超重要）指定する全ての画像URLおよび動画URLは、必ず「現在アクセス可能で実在する公式リンク」を記載してください。架空のURL（ハルシネーション）やリンク切れのURLは絶対に使用しないでください。確証がない場合は空文字にしてください。
+- （超重要）指定する全ての画像URLおよび動画URLは、必ず「現在アクセス可能で実在する公式リンク」を記載してください。適当な外部サイトのURLや架空のURL（ハルシネーション）は絶対に使用しないでください。確証がない場合は空文字にしてください。
 
 ## ニュース情報
 タイトル: ${news.title}
