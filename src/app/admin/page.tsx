@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import {
     Shield, Eye, Trash2, Check, X, Clock, ExternalLink,
-    LogIn, RefreshCw, Pencil, Save, ArrowLeft
+    LogIn, RefreshCw, Pencil, Save, ArrowLeft, Plus
 } from "lucide-react";
 import type { Article } from "@/lib/supabase";
 
@@ -13,8 +13,13 @@ export default function AdminPage() {
     const [articles, setArticles] = useState<Article[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
+
+    // UI State
+    const [viewMode, setViewMode] = useState<"list" | "editor">("list");
     const [activeTab, setActiveTab] = useState<"draft" | "published">("draft");
-    const [editingArticle, setEditingArticle] = useState<Article | null>(null);
+
+    // Editor State
+    const [editingArticleId, setEditingArticleId] = useState<string | null>(null);
     const [editForm, setEditForm] = useState({
         title: "",
         excerpt: "",
@@ -49,10 +54,10 @@ export default function AdminPage() {
     }, [password]);
 
     useEffect(() => {
-        if (isAuthenticated) {
+        if (isAuthenticated && viewMode === "list") {
             fetchArticles();
         }
-    }, [isAuthenticated, fetchArticles]);
+    }, [isAuthenticated, fetchArticles, viewMode]);
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -107,8 +112,21 @@ export default function AdminPage() {
         }
     };
 
-    const startEditing = (article: Article) => {
-        setEditingArticle(article);
+    // --- Editor Actions ---
+    const openEditorForNew = () => {
+        setEditingArticleId(null);
+        setEditForm({
+            title: "",
+            excerpt: "",
+            content: "",
+            tags: "",
+            image_url: "",
+        });
+        setViewMode("editor");
+    };
+
+    const openEditorForEdit = (article: Article) => {
+        setEditingArticleId(article.id);
         setEditForm({
             title: article.title,
             excerpt: article.excerpt,
@@ -116,36 +134,53 @@ export default function AdminPage() {
             tags: article.tags.join(", "),
             image_url: article.image_url,
         });
+        setViewMode("editor");
     };
 
-    const handleSaveEdit = async () => {
-        if (!editingArticle) return;
+    const handleSave = async (status: "draft" | "published" = "draft") => {
+        if (!editForm.title.trim()) {
+            setError("タイトルを入力してください");
+            return;
+        }
+
         setSaving(true);
         setError("");
+
         try {
-            const res = await fetch("/api/admin/articles", {
-                method: "PUT",
+            const isEditing = !!editingArticleId;
+            const url = "/api/admin/articles";
+            const method = isEditing ? "PUT" : "POST";
+
+            const payload: any = {
+                title: editForm.title,
+                excerpt: editForm.excerpt,
+                content: editForm.content,
+                tags: editForm.tags.split(",").map((t) => t.trim()).filter(Boolean),
+                image_url: editForm.image_url,
+            };
+
+            if (isEditing) {
+                payload.id = editingArticleId;
+            } else {
+                payload.status = status;
+            }
+
+            const res = await fetch(url, {
+                method,
                 headers: {
                     "Content-Type": "application/json",
                     Authorization: `Bearer ${password}`,
                 },
-                body: JSON.stringify({
-                    id: editingArticle.id,
-                    title: editForm.title,
-                    excerpt: editForm.excerpt,
-                    content: editForm.content,
-                    tags: editForm.tags.split(",").map((t) => t.trim()).filter(Boolean),
-                    image_url: editForm.image_url,
-                }),
+                body: JSON.stringify(payload),
             });
+
             if (res.ok) {
-                setEditingArticle(null);
-                fetchArticles();
+                setViewMode("list");
             } else {
                 setError("保存に失敗しました");
             }
         } catch {
-            setError("保存に失敗しました");
+            setError("ネットワークエラーが発生しました");
         } finally {
             setSaving(false);
         }
@@ -155,7 +190,7 @@ export default function AdminPage() {
     const published = articles.filter((a) => a.status === "published");
     const displayArticles = activeTab === "draft" ? drafts : published;
 
-    // ---- Login Screen ----
+    // ---- 1. Login Screen ----
     if (!isAuthenticated) {
         return (
             <div className="flex min-h-[60vh] items-center justify-center px-4">
@@ -195,156 +230,150 @@ export default function AdminPage() {
         );
     }
 
-    // ---- Edit Screen ----
-    if (editingArticle) {
+    // ---- 2. Editor Screen (Note-like clean UI) ----
+    if (viewMode === "editor") {
         return (
-            <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
-                <button
-                    onClick={() => setEditingArticle(null)}
-                    className="mb-6 flex items-center gap-2 text-sm font-medium text-zinc-500 transition-colors hover:text-orange-600 dark:text-zinc-400"
-                >
-                    <ArrowLeft className="h-4 w-4" />
-                    一覧に戻る
-                </button>
-
-                <div className="mb-6 flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-orange-500 to-red-500">
-                        <Pencil className="h-5 w-5 text-white" />
+            <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 min-h-screen bg-white dark:bg-zinc-950">
+                {/* Editor Header (Sticky) */}
+                <div className="sticky top-0 z-10 flex items-center justify-between bg-white/80 py-4 backdrop-blur-md dark:bg-zinc-950/80 mb-6 border-b border-zinc-100 dark:border-zinc-800/50">
+                    <button
+                        onClick={() => setViewMode("list")}
+                        className="flex items-center gap-2 text-sm font-medium text-zinc-500 transition-colors hover:text-orange-600 dark:text-zinc-400"
+                    >
+                        <ArrowLeft className="h-4 w-4" />
+                        戻る
+                    </button>
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={() => handleSave("draft")}
+                            disabled={saving}
+                            className="rounded-full bg-zinc-100 px-5 py-2 text-sm font-semibold text-zinc-700 transition-colors hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700 disabled:opacity-50"
+                        >
+                            {saving ? "保存中..." : editingArticleId ? "上書き保存" : "下書き保存"}
+                        </button>
+                        {!editingArticleId && (
+                            <button
+                                onClick={() => handleSave("published")}
+                                disabled={saving}
+                                className="rounded-full bg-orange-500 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-orange-600 shadow-sm disabled:opacity-50"
+                            >
+                                公開する
+                            </button>
+                        )}
                     </div>
-                    <h1 className="text-xl font-bold text-zinc-900 dark:text-white">記事を編集</h1>
                 </div>
 
                 {error && (
-                    <div className="mb-4 rounded-lg bg-red-50 px-4 py-2 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400">
+                    <div className="mb-6 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400">
                         {error}
                     </div>
                 )}
 
-                <div className="space-y-5 rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 sm:p-8">
-                    {/* Title */}
-                    <div>
-                        <label className="mb-2 block text-sm font-semibold text-zinc-700 dark:text-zinc-300">
-                            タイトル
-                        </label>
+                {/* Main Editor Area */}
+                <div className="max-w-3xl mx-auto space-y-6 pb-20">
+                    {/* Cover Image Input */}
+                    <input
+                        type="text"
+                        placeholder="カバー画像URL (https://...)"
+                        value={editForm.image_url}
+                        onChange={(e) => setEditForm({ ...editForm, image_url: e.target.value })}
+                        className="w-full bg-transparent text-sm text-zinc-500 placeholder-zinc-400 outline-none border-b border-zinc-200 dark:border-zinc-800 py-2 focus:border-orange-500 transition-colors dark:text-zinc-400"
+                    />
+
+                    {editForm.image_url && (
+                        <div className="mb-6 w-full overflow-hidden rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 aspect-video">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                                src={editForm.image_url}
+                                alt="カバー画像"
+                                className="h-full w-full object-cover"
+                                onError={(e) => (e.currentTarget.style.display = 'none')}
+                            />
+                        </div>
+                    )}
+
+                    {/* Title Input */}
+                    <textarea
+                        value={editForm.title}
+                        onChange={(e) => {
+                            setEditForm({ ...editForm, title: e.target.value });
+                            e.target.style.height = 'auto';
+                            e.target.style.height = e.target.scrollHeight + 'px';
+                        }}
+                        placeholder="記事タイトル"
+                        rows={1}
+                        className="w-full resize-none overflow-hidden bg-transparent text-3xl font-bold leading-tight text-zinc-900 outline-none placeholder:text-zinc-300 dark:text-white dark:placeholder:text-zinc-700 sm:text-4xl"
+                    />
+
+                    {/* Tags & Excerpt Input */}
+                    <div className="space-y-4 rounded-xl bg-zinc-50 p-5 dark:bg-zinc-900/50">
                         <input
                             type="text"
-                            value={editForm.title}
-                            onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
-                            className="w-full rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white"
+                            placeholder="タグ（カンマ区切り: ゲーム, Switch, レビュー）"
+                            value={editForm.tags}
+                            onChange={(e) => setEditForm({ ...editForm, tags: e.target.value })}
+                            className="w-full bg-transparent text-sm text-zinc-700 outline-none placeholder:text-zinc-400 dark:text-zinc-300"
                         />
-                    </div>
-
-                    {/* Excerpt */}
-                    <div>
-                        <label className="mb-2 block text-sm font-semibold text-zinc-700 dark:text-zinc-300">
-                            要約
-                        </label>
+                        <div className="h-px w-full bg-zinc-200 dark:bg-zinc-800" />
                         <textarea
                             value={editForm.excerpt}
                             onChange={(e) => setEditForm({ ...editForm, excerpt: e.target.value })}
+                            placeholder="記事の要約・リード文（SNSなどで表示されます）"
                             rows={2}
-                            className="w-full resize-none rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white"
+                            className="w-full resize-none bg-transparent text-sm leading-relaxed text-zinc-600 outline-none placeholder:text-zinc-400 dark:text-zinc-400"
                         />
                     </div>
 
-                    {/* Content */}
-                    <div>
-                        <label className="mb-2 block text-sm font-semibold text-zinc-700 dark:text-zinc-300">
-                            本文（HTML）
-                        </label>
+                    {/* Content Body Input (HTML allowed) */}
+                    <div className="relative group mt-8">
                         <textarea
                             value={editForm.content}
                             onChange={(e) => setEditForm({ ...editForm, content: e.target.value })}
-                            rows={15}
-                            className="w-full resize-y rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-2.5 font-mono text-xs leading-relaxed outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white"
+                            placeholder="記事の本文を入力してください... (HTML使用可能)"
+                            className="min-h-[50vh] w-full resize-y bg-transparent text-base leading-loose text-zinc-800 outline-none placeholder:text-zinc-300 dark:text-zinc-200 dark:placeholder:text-zinc-700"
                         />
-                    </div>
-
-                    {/* Tags */}
-                    <div>
-                        <label className="mb-2 block text-sm font-semibold text-zinc-700 dark:text-zinc-300">
-                            タグ（カンマ区切り）
-                        </label>
-                        <input
-                            type="text"
-                            value={editForm.tags}
-                            onChange={(e) => setEditForm({ ...editForm, tags: e.target.value })}
-                            placeholder="Nintendo, Switch, ゲーム"
-                            className="w-full rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white"
-                        />
-                    </div>
-
-                    {/* Image URL */}
-                    <div>
-                        <label className="mb-2 block text-sm font-semibold text-zinc-700 dark:text-zinc-300">
-                            サムネイル画像URL
-                        </label>
-                        <input
-                            type="text"
-                            value={editForm.image_url}
-                            onChange={(e) => setEditForm({ ...editForm, image_url: e.target.value })}
-                            className="w-full rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white"
-                        />
-                        {editForm.image_url && (
-                            <div className="mt-2 overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-700">
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img
-                                    src={editForm.image_url}
-                                    alt="プレビュー"
-                                    className="h-40 w-full object-cover"
-                                />
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Save Button */}
-                    <div className="flex items-center gap-3 border-t border-zinc-200 pt-5 dark:border-zinc-700">
-                        <button
-                            onClick={handleSaveEdit}
-                            disabled={saving}
-                            className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-orange-500 to-red-500 px-6 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
-                        >
-                            <Save className="h-4 w-4" />
-                            {saving ? "保存中..." : "保存する"}
-                        </button>
-                        <button
-                            onClick={() => setEditingArticle(null)}
-                            className="rounded-lg border border-zinc-200 px-4 py-2.5 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
-                        >
-                            キャンセル
-                        </button>
                     </div>
                 </div>
             </div>
         );
     }
 
-    // ---- Admin Dashboard ----
+    // ---- 3. Admin Dashboard List Screen ----
     return (
         <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
             {/* Header */}
-            <div className="mb-8 flex items-center justify-between">
+            <div className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-500 to-red-500">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-500 to-red-500 shadow-sm">
                         <Shield className="h-6 w-6 text-white" />
                     </div>
                     <div>
-                        <h1 className="text-2xl font-extrabold text-zinc-900 dark:text-white">
+                        <h1 className="text-2xl font-extrabold text-zinc-900 dark:text-white mt-1">
                             記事管理
                         </h1>
-                        <p className="text-sm text-zinc-500">
-                            下書き: {drafts.length}件 / 公開済み: {published.length}件
+                        <p className="text-sm text-zinc-500 font-medium">
+                            {drafts.length} 下書き · {published.length} 公開済み
                         </p>
                     </div>
                 </div>
-                <button
-                    onClick={fetchArticles}
-                    disabled={loading}
-                    className="flex items-center gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
-                >
-                    <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-                    更新
-                </button>
+
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={fetchArticles}
+                        disabled={loading}
+                        className="flex h-10 w-10 items-center justify-center rounded-full border border-zinc-200 text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-900"
+                        aria-label="更新"
+                    >
+                        <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+                    </button>
+                    <button
+                        onClick={openEditorForNew}
+                        className="flex items-center gap-2 rounded-full bg-zinc-900 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-transform hover:scale-105 dark:bg-white dark:text-zinc-900"
+                    >
+                        <Plus className="h-4 w-4" />
+                        記事を書く
+                    </button>
+                </div>
             </div>
 
             {error && (
@@ -354,21 +383,21 @@ export default function AdminPage() {
             )}
 
             {/* Tabs */}
-            <div className="mb-6 flex gap-1 rounded-xl bg-zinc-100 p-1 dark:bg-zinc-800">
+            <div className="mb-6 flex gap-1 rounded-xl bg-zinc-100 p-1 dark:bg-zinc-900/50">
                 <button
                     onClick={() => setActiveTab("draft")}
-                    className={`flex-1 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${activeTab === "draft"
-                            ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-700 dark:text-white"
-                            : "text-zinc-500 hover:text-zinc-700 dark:text-zinc-400"
+                    className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-bold transition-all ${activeTab === "draft"
+                            ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-800 dark:text-white"
+                            : "text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
                         }`}
                 >
                     📝 下書き ({drafts.length})
                 </button>
                 <button
                     onClick={() => setActiveTab("published")}
-                    className={`flex-1 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${activeTab === "published"
-                            ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-700 dark:text-white"
-                            : "text-zinc-500 hover:text-zinc-700 dark:text-zinc-400"
+                    className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-bold transition-all ${activeTab === "published"
+                            ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-800 dark:text-white"
+                            : "text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
                         }`}
                 >
                     ✅ 公開済み ({published.length})
@@ -376,27 +405,27 @@ export default function AdminPage() {
             </div>
 
             {/* Article List */}
-            <div className="space-y-3">
+            <div className="space-y-4">
                 {displayArticles.map((article) => (
                     <div
                         key={article.id}
-                        className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 sm:p-5"
+                        className="group rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900 sm:p-6"
                     >
-                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-4">
-                            <div className="min-w-0 flex-1">
-                                <h3 className="text-sm font-bold text-zinc-800 dark:text-zinc-100 sm:text-base">
+                        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-6">
+                            <div className="min-w-0 flex-1 cursor-pointer" onClick={() => openEditorForEdit(article)}>
+                                <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100 transition-colors group-hover:text-orange-500">
                                     {article.title}
                                 </h3>
-                                <p className="mt-1 line-clamp-2 text-xs text-zinc-500 dark:text-zinc-400">
-                                    {article.excerpt}
+                                <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400 line-clamp-2 leading-relaxed">
+                                    {article.excerpt || "本文なし"}
                                 </p>
-                                <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-zinc-400">
-                                    <div className="flex items-center gap-1">
-                                        <Clock className="h-3 w-3" />
+                                <div className="mt-3 flex flex-wrap items-center gap-4 text-xs font-medium text-zinc-400">
+                                    <div className="flex items-center gap-1.5">
+                                        <Clock className="h-3.5 w-3.5" />
                                         <span>{new Date(article.created_at).toLocaleDateString("ja-JP")}</span>
                                     </div>
-                                    <div className="flex items-center gap-1">
-                                        <Eye className="h-3 w-3" />
+                                    <div className="flex items-center gap-1.5">
+                                        <Eye className="h-3.5 w-3.5" />
                                         <span>{article.views} views</span>
                                     </div>
                                     {article.source_url && (
@@ -405,9 +434,10 @@ export default function AdminPage() {
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             className="flex items-center gap-1 text-orange-500 hover:text-orange-600"
+                                            onClick={(e) => e.stopPropagation()}
                                         >
-                                            <ExternalLink className="h-3 w-3" />
-                                            {article.source_name ?? "引用元"}
+                                            <ExternalLink className="h-3.5 w-3.5" />
+                                            引用元
                                         </a>
                                     )}
                                 </div>
@@ -416,8 +446,8 @@ export default function AdminPage() {
                             {/* Actions */}
                             <div className="flex shrink-0 flex-wrap items-center gap-2">
                                 <button
-                                    onClick={() => startEditing(article)}
-                                    className="flex items-center gap-1.5 rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-600 transition-colors hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/40"
+                                    onClick={() => openEditorForEdit(article)}
+                                    className="flex items-center gap-1.5 rounded-lg bg-zinc-100 px-3 py-2 text-xs font-semibold text-zinc-700 transition-colors hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
                                 >
                                     <Pencil className="h-3.5 w-3.5" />
                                     編集
@@ -425,7 +455,7 @@ export default function AdminPage() {
                                 {article.status === "draft" ? (
                                     <button
                                         onClick={() => handleStatusChange(article.id, "published")}
-                                        className="flex items-center gap-1.5 rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-emerald-600"
+                                        className="flex items-center gap-1.5 rounded-lg bg-emerald-500 px-3 py-2 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-emerald-600"
                                     >
                                         <Check className="h-3.5 w-3.5" />
                                         公開する
@@ -433,18 +463,18 @@ export default function AdminPage() {
                                 ) : (
                                     <button
                                         onClick={() => handleStatusChange(article.id, "draft")}
-                                        className="flex items-center gap-1.5 rounded-lg bg-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-700 transition-colors hover:bg-zinc-300 dark:bg-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-600"
+                                        className="flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs font-semibold text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
                                     >
                                         <X className="h-3.5 w-3.5" />
-                                        非公開
+                                        非公開にする
                                     </button>
                                 )}
                                 <button
                                     onClick={() => handleDelete(article.id)}
-                                    className="flex items-center gap-1.5 rounded-lg bg-red-50 px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/40"
+                                    className="flex items-center justify-center rounded-lg bg-red-50 p-2 text-red-500 transition-colors hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/40"
+                                    aria-label="削除"
                                 >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                    削除
+                                    <Trash2 className="h-4 w-4" />
                                 </button>
                             </div>
                         </div>
@@ -452,9 +482,15 @@ export default function AdminPage() {
                 ))}
 
                 {displayArticles.length === 0 && (
-                    <div className="rounded-2xl border border-zinc-200 bg-white p-12 text-center dark:border-zinc-800 dark:bg-zinc-900">
-                        <p className="text-zinc-500 dark:text-zinc-400">
-                            {activeTab === "draft" ? "下書き記事はありません" : "公開済み記事はありません"}
+                    <div className="rounded-3xl border border-dashed border-zinc-300 bg-zinc-50/50 p-16 text-center dark:border-zinc-800 dark:bg-zinc-900/20 flex flex-col items-center justify-center">
+                        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-800">
+                            📝
+                        </div>
+                        <h3 className="mb-1 font-bold text-zinc-900 dark:text-white">
+                            {activeTab === "draft" ? "下書きがありません" : "公開済みの記事がありません"}
+                        </h3>
+                        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                            「記事を書く」ボタンから新しい記事を作成しましょう
                         </p>
                     </div>
                 )}

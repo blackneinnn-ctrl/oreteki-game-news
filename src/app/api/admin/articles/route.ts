@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAllArticles, updateArticleStatus, deleteArticle, updateArticle } from '@/data/articles';
+import { getAllArticles, updateArticleStatus, deleteArticle, updateArticle, createArticle } from '@/data/articles';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 
@@ -59,6 +59,33 @@ export async function PUT(request: NextRequest) {
     const success = await updateArticle(id, updates);
     if (!success) {
         return NextResponse.json({ error: 'Failed to update' }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true });
+}
+
+// 新規記事を作成
+export async function POST(request: NextRequest) {
+    if (!checkAuth(request)) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { title, excerpt, content, tags, image_url, status } = await request.json();
+    if (!title || !content) {
+        return NextResponse.json({ error: 'Title and content are required' }, { status: 400 });
+    }
+
+    const success = await createArticle({
+        title,
+        excerpt: excerpt || '',
+        content: content,
+        tags: tags || [],
+        image_url: image_url || `https://picsum.photos/seed/${Date.now()}/1200/630`,
+        status: status || 'draft',
+    });
+
+    if (!success) {
+        return NextResponse.json({ error: 'Failed to create' }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });

@@ -1,0 +1,25 @@
+========================================
+🔍 全体診断を開始
+========================================
+
+--- 1. 環境変数 ---
+SUPABASE_URL: ✅ https://yqoltuzcdhhuowvdwpct.supabase.co
+SUPABASE_KEY: ✅ eyJhbGciOiJIUzI1NiIs...
+GEMINI_KEY:   ✅ AIzaSyCNTwGd_pl...
+
+--- 2. Supabase ---
+✅ SELECT成功: 0件
+✅ INSERT成功: 25cc1ebd-8954-4abc-bab3-770234028d9e
+✅ DELETE成功（テスト行削除）
+
+--- 3. RSS ---
+✅ 4Gamer: 100件
+✅ AUTOMATON: 30件
+❌ GameSpark: Status code 404
+
+--- 4. Gemini API ---
+❌ Gemini失敗: {"error":{"code":429,"message":"You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for metri
+
+========================================
+🔍 診断完了
+========================================

@@ -130,6 +130,37 @@ export async function updateArticle(id: string, updates: {
   return true;
 }
 
+// 新規記事を作成
+export async function createArticle(article: {
+  title: string;
+  excerpt?: string;
+  content: string;
+  tags?: string[];
+  image_url?: string;
+  status?: 'draft' | 'published';
+}): Promise<boolean> {
+  const slug = `article-${Date.now()}`;
+  const { error } = await supabase
+    .from('articles')
+    .insert({
+      title: article.title,
+      slug: slug,
+      excerpt: article.excerpt || '',
+      content: article.content,
+      tags: article.tags || [],
+      image_url: article.image_url || `https://picsum.photos/seed/${Date.now()}/1200/630`,
+      author: '管理人',
+      status: article.status || 'draft',
+      views: 0,
+    });
+
+  if (error) {
+    console.error('Error creating article:', error);
+    return false;
+  }
+  return true;
+}
+
 // 閲覧数を増やす
 export async function incrementViews(id: string): Promise<void> {
   await supabase.rpc('increment_views', { article_id: id });
