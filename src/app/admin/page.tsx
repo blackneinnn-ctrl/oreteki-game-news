@@ -28,6 +28,7 @@ export default function AdminPage() {
         image_url: "",
     });
     const [saving, setSaving] = useState(false);
+    const [sortBy, setSortBy] = useState<"date" | "views">("date");
 
     const fetchArticles = useCallback(async () => {
         setLoading(true);
@@ -188,7 +189,16 @@ export default function AdminPage() {
 
     const drafts = articles.filter((a) => a.status === "draft");
     const published = articles.filter((a) => a.status === "published");
-    const displayArticles = activeTab === "draft" ? drafts : published;
+
+    // Sort display articles
+    let displayArticles = activeTab === "draft" ? drafts : published;
+    displayArticles = [...displayArticles].sort((a, b) => {
+        if (sortBy === "views") {
+            return b.views - a.views;
+        }
+        // date sort (default)
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
 
     // ---- 1. Login Screen ----
     if (!isAuthenticated) {
@@ -452,26 +462,41 @@ export default function AdminPage() {
                 </div>
             )}
 
-            {/* Tabs */}
-            <div className="mb-6 flex gap-1 rounded-xl bg-zinc-100 p-1 dark:bg-zinc-900/50">
-                <button
-                    onClick={() => setActiveTab("draft")}
-                    className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-bold transition-all ${activeTab === "draft"
-                        ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-800 dark:text-white"
-                        : "text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
-                        }`}
-                >
-                    📝 下書き ({drafts.length})
-                </button>
-                <button
-                    onClick={() => setActiveTab("published")}
-                    className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-bold transition-all ${activeTab === "published"
-                        ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-800 dark:text-white"
-                        : "text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
-                        }`}
-                >
-                    ✅ 公開済み ({published.length})
-                </button>
+            {/* Tabs & Sort */}
+            <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div className="flex w-full gap-1 rounded-xl bg-zinc-100 p-1 dark:bg-zinc-900/50 sm:w-auto">
+                    <button
+                        onClick={() => setActiveTab("draft")}
+                        className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-bold transition-all sm:flex-none ${activeTab === "draft"
+                            ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-800 dark:text-white"
+                            : "text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
+                            }`}
+                    >
+                        📝 下書き ({drafts.length})
+                    </button>
+                    <button
+                        onClick={() => setActiveTab("published")}
+                        className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-bold transition-all sm:flex-none ${activeTab === "published"
+                            ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-800 dark:text-white"
+                            : "text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
+                            }`}
+                    >
+                        ✅ 公開済み ({published.length})
+                    </button>
+                </div>
+
+                <div className="flex items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400 self-end sm:self-auto">
+                    <label htmlFor="sort-select" className="font-medium">並び替え:</label>
+                    <select
+                        id="sort-select"
+                        value={sortBy}
+                        onChange={(e) => setSortBy(e.target.value as "date" | "views")}
+                        className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 outline-none transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700 focus:ring-2 focus:ring-orange-500/20"
+                    >
+                        <option value="date">新しい順</option>
+                        <option value="views">閲覧数が多い順</option>
+                    </select>
+                </div>
             </div>
 
             {/* Article List */}
