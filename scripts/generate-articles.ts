@@ -133,7 +133,7 @@ async function generateArticle(news: NewsItem, retries = 3): Promise<{
 ## ニュース情報
 タイトル: ${news.title}
 ソース: ${news.sourceName}
-URL: ${news.link}
+URL: ${news.link || 'なし (キーワード指定)'}
 概要: ${news.summary.substring(0, 500)}
 
 ## 出力形式（JSON）
@@ -248,6 +248,9 @@ async function saveArticle(
 async function main() {
     console.log('🚀 記事生成を開始...\n');
 
+    // コマンドライン引数を取得（例: npm run generate "モンハンワイルズ"）
+    const keyword = process.argv[2];
+
     // DB接続テスト
     console.log('🔌 Supabase接続テスト...');
     const { error: testError } = await supabase.from('articles').select('id').limit(1);
@@ -258,8 +261,20 @@ async function main() {
     }
     console.log('✅ Supabase接続OK\n');
 
-    const news = await fetchNews();
-    console.log(`\n📰 合計 ${news.length}件のニュースを取得\n`);
+    let news: NewsItem[] = [];
+
+    if (keyword) {
+        console.log(`🎯 キーワード指定モード: 「${keyword}」についてリサーチします\n`);
+        news = [{
+            title: keyword,
+            link: '', // 特定のURLがないため空
+            sourceName: 'AI Web Research',
+            summary: `「${keyword}」に関する最新のゲームニュースや話題、アップデート情報などを幅広くリサーチして記事を作成してください。`,
+        }];
+    } else {
+        news = await fetchNews();
+        console.log(`\n📰 合計 ${news.length}件のニュースを取得\n`);
+    }
 
     let generated = 0;
     const maxArticles = 1;
@@ -267,7 +282,8 @@ async function main() {
     for (const item of news) {
         if (generated >= maxArticles) break;
 
-        if (await isDuplicate(item.link)) {
+        // キーワード指定モードの場合は重複チェックをスキップするか、URLがないので別の方法で判定
+        if (!keyword && await isDuplicate(item.link)) {
             console.log(`⏭️  スキップ（既存）: ${item.title.substring(0, 50)}...`);
             continue;
         }
