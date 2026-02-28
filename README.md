@@ -1,36 +1,43 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 俺的ゲームニュース (News Blog)
 
-## Getting Started
+Next.js (App Router) + Supabase + Gemini API を使用したゲームニュースブログシステムです。
 
-First, run the development server:
+## 🚀 記事の自動生成機能について
 
+本プロジェクトには、AI（Gemini）を利用してゲームニュース記事を自動でリサーチ・生成するスクリプトが用意されています。
+
+### 1. 通常モード（RSSからの取得）
+登録されているゲームメディア（AUTOMATON、ファミ通.com、4Gamer.netなど）のRSSフィードから最新ニュースを取得し、それをもとに記事を1件自動作成します。
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm run generate
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 2. キーワード指定モード（手動リサーチ）
+特定のゲームタイトルやニュースについてAIにゼロからリサーチさせて記事を作りたい場合は、コマンドの後ろにキーワードを指定します。
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+# スペースが含まれない単語の場合はそのまま指定可能
+npm run generate モンハンワイルズ
+npm run generate GTA6
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+# ⚠️ 注意: スペースが含まれる言葉は必ず "" (ダブルクォーテーション) で囲んでください
+npm run generate "GTA6 最新リーク"
+npm run generate "Switch 後継機"
+```
 
-## Learn More
+※ もし `""` で囲わずに `npm run generate GTA6 最新リーク` と打った場合、コンピューターは最初の単語である「GTA6」だけをキーワードとして認識してしまいまうので注意してください。
 
-To learn more about Next.js, take a look at the following resources:
+## ⚙️ 環境構築手順
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+# 1. パッケージのインストール
+npm install
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+# 2. 環境変数の設定
+# .env.local ファイルを作成し、SupabaseとGeminiのキーを設定してください
 
-## Deploy on Vercel
+# 3. 開発サーバーの起動
+npm run dev
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+ブラウザで [http://localhost:3000](http://localhost:3000) にアクセスすると確認できます。
