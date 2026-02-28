@@ -271,26 +271,96 @@ export default function AdminPage() {
 
                 {/* Main Editor Area */}
                 <div className="max-w-3xl mx-auto space-y-6 pb-20">
-                    {/* Cover Image Input */}
-                    <input
-                        type="text"
-                        placeholder="カバー画像URL (https://...)"
-                        value={editForm.image_url}
-                        onChange={(e) => setEditForm({ ...editForm, image_url: e.target.value })}
-                        className="w-full bg-transparent text-sm text-zinc-500 placeholder-zinc-400 outline-none border-b border-zinc-200 dark:border-zinc-800 py-2 focus:border-orange-500 transition-colors dark:text-zinc-400"
-                    />
+                    {/* Cover Image Upload & Input */}
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-4">
+                            <label className="flex cursor-pointer items-center gap-2 rounded-lg bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700">
+                                <Plus className="h-4 w-4" />
+                                画像をアップロード
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    onChange={async (e) => {
+                                        const file = e.target.files?.[0];
+                                        if (!file) return;
 
-                    {editForm.image_url && (
-                        <div className="mb-6 w-full overflow-hidden rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 aspect-video">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                                src={editForm.image_url}
-                                alt="カバー画像"
-                                className="h-full w-full object-cover"
-                                onError={(e) => (e.currentTarget.style.display = 'none')}
-                            />
+                                        try {
+                                            // Set loading state (reusing saving state for visual cue)
+                                            setSaving(true);
+                                            setError("");
+
+                                            // We need to fetch the supabase anon key from environment for client side,
+                                            // but since this is a client component, we should ideally use a client supabase instance.
+                                            // To keep it simple, let's use the browser's fetch API directly to Supabase REST.
+                                            // We'll need the project URL and ANON KEY from env.
+                                            const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+                                            const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+                                            if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+                                                throw new Error("Supabase config not found");
+                                            }
+
+                                            // Create a unique filename
+                                            const fileExt = file.name.split('.').pop();
+                                            const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}.${fileExt}`;
+                                            const filePath = `${fileName}`;
+
+                                            // Upload directly using REST API
+                                            const uploadRes = await fetch(`${SUPABASE_URL}/storage/v1/object/images/${filePath}`, {
+                                                method: 'POST',
+                                                headers: {
+                                                    'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                                                    'apikey': SUPABASE_ANON_KEY,
+                                                    'Content-Type': file.type,
+                                                },
+                                                body: file
+                                            });
+
+                                            if (!uploadRes.ok) {
+                                                console.error(await uploadRes.text());
+                                                throw new Error(`Upload failed: ${uploadRes.status}`);
+                                            }
+
+                                            // Get public URL
+                                            const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/images/${filePath}`;
+
+                                            // Update form state
+                                            setEditForm({ ...editForm, image_url: publicUrl });
+                                        } catch (err) {
+                                            console.error("Image upload error:", err);
+                                            setError("画像のアップロードに失敗しました");
+                                        } finally {
+                                            setSaving(false);
+                                            // clear the input so the same file could be selected again if needed
+                                            e.target.value = '';
+                                        }
+                                    }}
+                                />
+                            </label>
+                            <span className="text-sm text-zinc-400">またはURLを直接入力</span>
                         </div>
-                    )}
+
+                        <input
+                            type="text"
+                            placeholder="カバー画像URL (https://...)"
+                            value={editForm.image_url}
+                            onChange={(e) => setEditForm({ ...editForm, image_url: e.target.value })}
+                            className="w-full bg-transparent text-sm text-zinc-500 placeholder-zinc-400 outline-none border-b border-zinc-200 dark:border-zinc-800 py-2 focus:border-orange-500 transition-colors dark:text-zinc-400"
+                        />
+
+                        {editForm.image_url && (
+                            <div className="w-full overflow-hidden rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 aspect-video">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                    src={editForm.image_url}
+                                    alt="カバー画像"
+                                    className="h-full w-full object-cover"
+                                    onError={(e) => (e.currentTarget.style.display = 'none')}
+                                />
+                            </div>
+                        )}
+                    </div>
 
                     {/* Title Input */}
                     <textarea
@@ -387,8 +457,8 @@ export default function AdminPage() {
                 <button
                     onClick={() => setActiveTab("draft")}
                     className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-bold transition-all ${activeTab === "draft"
-                            ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-800 dark:text-white"
-                            : "text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
+                        ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-800 dark:text-white"
+                        : "text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
                         }`}
                 >
                     📝 下書き ({drafts.length})
@@ -396,8 +466,8 @@ export default function AdminPage() {
                 <button
                     onClick={() => setActiveTab("published")}
                     className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-bold transition-all ${activeTab === "published"
-                            ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-800 dark:text-white"
-                            : "text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
+                        ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-800 dark:text-white"
+                        : "text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
                         }`}
                 >
                     ✅ 公開済み ({published.length})
