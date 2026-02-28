@@ -101,28 +101,31 @@ async function generateArticle(news: NewsItem, retries = 3): Promise<{
     tags: string[];
     slug: string;
 } | null> {
-    const prompt = `あなたはゲームニュースブログ「俺的ゲームニュース」のライターです。
-以下のニュース情報をもとに、ゲームニュースブログ風の記事を作成してください。
+    const prompt = `あなたはゲームニュースブログ「俺的ゲームニュース」の専属Webリサーチャー兼ライターです。
+以下のニュース情報をもとに、事実に基づいた最新情報と独自の深掘りを含めたゲームブログ記事を作成してください。
 
-## 記事スタイルの参考例
-- タイトル例: 「上司をクビに!? 狂気のハム工場ゲーム爆誕」
-- 文体: カジュアルで親しみやすいが、過度なネットスラング（wwwwなど）は使わない
-- 読者に語りかけるように書く（「ご存知ですか？」「間違いなし！」など）
-- 「（笑）」「!?」「！」は適度に使ってOK
+## リサーチ指令
+以下のソースを必ず参考に（グラウンディング・Web検索機能を用いて）リサーチを行い、記事に反映してください。
+- 国内メディア: AUTOMATON、ファミ通.com、4Gamer.net
+- 海外・コミュニティ: Reddit、X（旧Twitter）のゲーム会社公式アカウントやユーザーの反応
+- 動画: YouTube公式トレーラーやプレイ動画
 
-## 記事構成（HTML）
-1. 冒頭の導入文 (<p>タグ) - ニュースの要点を1-2文で紹介
+## 記事構成と要件
+1. 冒頭の導入文 (<p>タグ) - ニュースの要点を紹介
 2. <h2>〇〇とは？</h2> - ゲームやニュースの詳しい紹介
-3. <h2>注目ポイント / 特徴</h2> - 斬新なシステムや魅力を解説
-4. <h2>ネットの予想や反応は？</h2> - ネット上の反応（推測OK、ただし事実と明確に区別する）
-5. <h2>公式情報・リンク</h2> - 公式サイトやSNSへのリンク（わかる場合のみ）
+3. <h2>注目ポイント / 最新情報</h2> - リサーチによる最新情報や魅力を解説
+4. <h2>民衆の意見・ネットの反応</h2> - XやRedditから拾った事実に基づく率直な意見・感想（推測ではなく実際の声の要約）
+5. <h2>公式情報</h2> - スペックや発売日などを箇条書きで
+
+## リッチメディアの抽出
+- リサーチ中に発見した**YouTubeの公式動画URL**があれば \`youtubeUrl\` に含めてください（ない場合は空文字）。
+- **SteamのストアページURL**があれば \`steamUrl\` に含めてください（ない場合は空文字）。
 
 ## ルール
 - 本文はHTMLで書く（h2, p, a, ul, liタグを使用）
-- ニュースの事実だけを要約する（著作権に配慮し、原文をそのままコピーしない）
-- ネットの反応セクションは推測でもOKだが「事実に基づいた情報がないため」と明記するか、自然な形でコメントを紹介する
-- 記事末尾に「<p class="text-xs text-zinc-400 mt-8">※この記事はAIが生成したものです。引用元の情報を確認してください。</p>」は自動追加されるので含めない
-- 引用元の名前とURLは別途管理するので本文に含めない
+- 事実に基づいた精度の高い執筆を行うこと
+- 決して「この記事はAIが生成しました」といった文言はいれないこと
+- YouTubeやSteamの埋め込みタグはシステム側で行うため、本文HTML (\`content\`) の中にはiframeを書かないでください
 
 ## ニュース情報
 タイトル: ${news.title}
@@ -134,7 +137,9 @@ async function generateArticle(news: NewsItem, retries = 3): Promise<{
   "title": "読者の興味を引くタイトル（煽りすぎず、キャッチーに）",
   "excerpt": "記事の要約（1-2文、100文字以内）",
   "content": "<p>導入文</p><h2>見出し</h2><p>本文</p>...",
-  "tags": ["タグ1", "タグ2", "タグ3"]
+  "tags": ["タグ1", "タグ2", "タグ3"],
+  "youtubeUrl": "https://www.youtube.com/watch?v=...",
+  "steamUrl": "https://store.steampowered.com/app/..."
 }
 
 JSONのみを出力してください。マークダウンのコードブロックは不要です。`;
@@ -150,10 +155,30 @@ JSONのみを出力してください。マークダウンのコードブロッ�
             const jsonStr = text.replace(/^```json?\n?/i, '').replace(/\n?```$/i, '').trim();
             const parsed = JSON.parse(jsonStr);
 
+            let finalContent = '';
+
+            // YouTubeが抽出されていれば冒頭に埋め込み
+            if (parsed.youtubeUrl) {
+                const videoIdMatch = parsed.youtubeUrl.match(/(?:v=|youtu\.be\/)([^&]+)/);
+                if (videoIdMatch && videoIdMatch[1]) {
+                    finalContent += `<div class="aspect-video mb-8 w-full overflow-hidden rounded-xl bg-zinc-100 dark:bg-zinc-800"><iframe width="100%" height="100%" src="https://www.youtube.com/embed/${videoIdMatch[1]}" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div>\n`;
+                }
+            }
+
+            finalContent += parsed.content;
+
+            // Steamが抽出されていれば末尾に埋め込み
+            if (parsed.steamUrl) {
+                const appIdMatch = parsed.steamUrl.match(/\/app\/(\d+)/);
+                if (appIdMatch && appIdMatch[1]) {
+                    finalContent += `\n<div class="mt-8"><iframe src="https://store.steampowered.com/widget/${appIdMatch[1]}/" frameborder="0" width="100%" height="190"></iframe></div>`;
+                }
+            }
+
             return {
                 title: parsed.title,
                 excerpt: parsed.excerpt,
-                content: parsed.content + '\n<p class="text-xs text-zinc-400 mt-8">※この記事はAIが生成したものです。引用元の情報を確認してください。</p>',
+                content: finalContent,
                 tags: parsed.tags || [],
                 slug: slugify(parsed.title) || `news-${Date.now()}`,
             };
@@ -217,7 +242,7 @@ async function main() {
     console.log(`\n📰 合計 ${news.length}件のニュースを取得\n`);
 
     let generated = 0;
-    const maxArticles = 5;
+    const maxArticles = 1;
 
     for (const item of news) {
         if (generated >= maxArticles) break;
