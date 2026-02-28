@@ -110,6 +110,26 @@ export async function deleteArticle(id: string): Promise<boolean> {
   return true;
 }
 
+// 記事を編集
+export async function updateArticle(id: string, updates: {
+  title?: string;
+  excerpt?: string;
+  content?: string;
+  tags?: string[];
+  image_url?: string;
+}): Promise<boolean> {
+  const { error } = await supabase
+    .from('articles')
+    .update(updates)
+    .eq('id', id);
+
+  if (error) {
+    console.error('Error updating article:', error);
+    return false;
+  }
+  return true;
+}
+
 // 閲覧数を増やす
 export async function incrementViews(id: string): Promise<void> {
   await supabase.rpc('increment_views', { article_id: id });
