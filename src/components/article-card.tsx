@@ -1,9 +1,11 @@
 import Link from "next/link";
 import Image from "next/image";
 import { Clock, Eye } from "lucide-react";
-import type { Article } from "@/data/articles";
+import type { Article } from "@/lib/supabase";
 
 export function ArticleCard({ article }: { article: Article }) {
+    const date = new Date(article.published_at ?? article.created_at).toLocaleDateString('ja-JP');
+
     return (
         <Link
             href={`/articles/${article.slug}`}
@@ -12,7 +14,7 @@ export function ArticleCard({ article }: { article: Article }) {
             {/* Thumbnail */}
             <div className="relative aspect-video overflow-hidden">
                 <Image
-                    src={article.imageUrl}
+                    src={article.image_url}
                     alt={article.title}
                     fill
                     className="object-cover transition-transform duration-500 group-hover:scale-105"
@@ -35,7 +37,7 @@ export function ArticleCard({ article }: { article: Article }) {
                     </span>
                     <div className="flex items-center gap-1 text-zinc-400">
                         <Clock className="h-3 w-3" />
-                        <time className="text-xs">{article.publishedAt}</time>
+                        <time className="text-xs">{date}</time>
                     </div>
                     <div className="ml-auto flex items-center gap-1 text-zinc-400">
                         <Eye className="h-3 w-3" />

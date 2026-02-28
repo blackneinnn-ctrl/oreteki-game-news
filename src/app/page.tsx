@@ -1,24 +1,27 @@
-import Image from "next/image";
 import Link from "next/link";
+import Image from "next/image";
 import { Clock, ChevronRight, Flame, Eye } from "lucide-react";
-import { articles, getFeaturedArticles } from "@/data/articles";
+import { getPublishedArticles, getFeaturedArticles } from "@/data/articles";
 import { ArticleCard } from "@/components/article-card";
 import { Sidebar } from "@/components/sidebar";
 
-export default function Home() {
-  const featured = getFeaturedArticles();
-  const feedArticles = articles.filter((a) => !a.featured);
+export const revalidate = 60; // ISR: 60秒ごとに再検証
+
+export default async function Home() {
+  const featured = await getFeaturedArticles();
+  const allArticles = await getPublishedArticles();
+  const feedArticles = allArticles.filter(
+    (a) => !featured.some((f) => f.id === a.id)
+  );
 
   return (
     <>
       {/* Hero Section */}
       <section className="relative overflow-hidden bg-zinc-950">
-        {/* Decorative background elements */}
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(234,88,12,0.15),transparent_50%)]" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,rgba(220,38,38,0.1),transparent_50%)]" />
 
         <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-12">
-          {/* Section title */}
           <div className="mb-6 flex items-center gap-2">
             <Flame className="h-5 w-5 text-orange-400" />
             <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">
@@ -27,7 +30,6 @@ export default function Home() {
           </div>
 
           <div className="grid gap-4 lg:grid-cols-3 lg:grid-rows-2">
-            {/* Main featured article */}
             {featured[0] && (
               <Link
                 href={`/articles/${featured[0].slug}`}
@@ -35,7 +37,7 @@ export default function Home() {
               >
                 <div className="relative aspect-[16/10] lg:aspect-auto lg:h-full">
                   <Image
-                    src={featured[0].imageUrl}
+                    src={featured[0].image_url}
                     alt={featured[0].title}
                     fill
                     className="object-cover transition-transform duration-700 group-hover:scale-105"
@@ -57,7 +59,7 @@ export default function Home() {
                       <span>·</span>
                       <div className="flex items-center gap-1">
                         <Clock className="h-3 w-3" />
-                        <time>{featured[0].publishedAt}</time>
+                        <time>{new Date(featured[0].published_at ?? featured[0].created_at).toLocaleDateString('ja-JP')}</time>
                       </div>
                       <div className="flex items-center gap-1">
                         <Eye className="h-3 w-3" />
@@ -69,7 +71,6 @@ export default function Home() {
               </Link>
             )}
 
-            {/* Secondary featured articles */}
             {featured.slice(1, 3).map((article) => (
               <Link
                 key={article.id}
@@ -78,7 +79,7 @@ export default function Home() {
               >
                 <div className="relative aspect-video">
                   <Image
-                    src={article.imageUrl}
+                    src={article.image_url}
                     alt={article.title}
                     fill
                     className="object-cover transition-transform duration-700 group-hover:scale-105"
@@ -92,7 +93,7 @@ export default function Home() {
                     </h3>
                     <div className="mt-2 flex items-center gap-2 text-xs text-zinc-400">
                       <Clock className="h-3 w-3" />
-                      <time>{article.publishedAt}</time>
+                      <time>{new Date(article.published_at ?? article.created_at).toLocaleDateString('ja-JP')}</time>
                       <Eye className="h-3 w-3 ml-1" />
                       <span>{(article.views / 1000).toFixed(0)}K</span>
                     </div>
@@ -107,9 +108,7 @@ export default function Home() {
       {/* Main Content + Sidebar */}
       <section className="mx-auto max-w-7xl px-4 py-10 sm:px-6 sm:py-14">
         <div className="flex flex-col gap-10 lg:flex-row">
-          {/* Article Feed */}
           <div className="flex-1">
-            {/* Section Header */}
             <div className="mb-6 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="h-8 w-1 rounded-full bg-gradient-to-b from-orange-500 to-red-500" />
@@ -126,15 +125,19 @@ export default function Home() {
               </Link>
             </div>
 
-            {/* Article Grid */}
             <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
               {feedArticles.map((article) => (
                 <ArticleCard key={article.id} article={article} />
               ))}
             </div>
+
+            {feedArticles.length === 0 && (
+              <div className="rounded-2xl border border-zinc-200 bg-white p-12 text-center dark:border-zinc-800 dark:bg-zinc-900">
+                <p className="text-zinc-500 dark:text-zinc-400">まだ記事がありません</p>
+              </div>
+            )}
           </div>
 
-          {/* Sidebar */}
           <div className="w-full shrink-0 lg:w-80">
             <Sidebar />
           </div>

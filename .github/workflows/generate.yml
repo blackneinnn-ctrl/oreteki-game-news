@@ -1,0 +1,33 @@
+name: Generate Articles
+
+on:
+  schedule:
+    # 毎日 朝9時（JST）= UTC 0:00
+    - cron: '0 0 * * *'
+    # 毎日 夕方18時（JST）= UTC 9:00
+    - cron: '0 9 * * *'
+  workflow_dispatch: # 手動実行可能
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate articles
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: npx tsx scripts/generate-articles.ts
