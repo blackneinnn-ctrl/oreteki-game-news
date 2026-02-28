@@ -161,7 +161,7 @@ async function generateArticle(news: NewsItem, retries = 3): Promise<{
 ## 記事構成と要件
 1. 冒頭の導入文 (<p>タグ) - ニュースの要点を紹介
 2. <h2>〇〇とは？</h2> - ゲームやニュースの詳しい紹介
-3. <h2>注目ポイント / 最新情報</h2> - リサーチによる最新情報や魅力を解説
+3. <h2>注目ポイント / 最新情報</h2> - **（重要）必ず直近1週間以内の最新の動向や発表内容**をGoogle検索でリサーチして解説してください。古い情報は除外してください。
 4. <h2>民衆の意見・ネットの反応</h2> - XやRedditから拾った事実に基づく率直な意見・感想（推測ではなく実際の声の要約）
 5. <h2>公式情報</h2> - スペックや発売日などを箇条書きで
 
@@ -208,6 +208,9 @@ JSONのみを出力してください。マークダウンのコードブロッ�
             const response = await ai.models.generateContent({
                 model: 'gemini-2.5-flash',
                 contents: prompt,
+                config: {
+                    tools: [{ googleSearch: {} }],
+                }
             });
 
             const text = response.text?.trim() || '';
