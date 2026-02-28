@@ -5,6 +5,7 @@ import { Clock, User, ArrowLeft, Tag, Eye, ExternalLink } from "lucide-react";
 import { getArticleBySlug, getPublishedArticles } from "@/data/articles";
 import { Sidebar } from "@/components/sidebar";
 import { ShareButton } from "@/components/share-button";
+import { ViewTracker } from "@/components/view-tracker";
 import { formatViews } from "@/lib/format";
 
 export const revalidate = 0; // 常に最新データを取得
@@ -32,6 +33,7 @@ export default async function ArticlePage({
 
     return (
         <>
+            <ViewTracker articleId={article.id} />
             {/* Hero Image */}
             <div className="relative h-[40vh] min-h-[320px] w-full overflow-hidden sm:h-[50vh] md:h-[55vh]">
                 <Image
