@@ -63,7 +63,7 @@ export default async function ArticlePage({
             </div>
 
             {/* Article Content */}
-            <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-12">
+            <div className="mx-auto max-w-[1400px] px-4 py-8 sm:px-6 sm:py-12">
                 <div className="flex flex-col gap-10 lg:flex-row">
                     <article className="min-w-0 flex-1">
                         {/* Meta Info */}

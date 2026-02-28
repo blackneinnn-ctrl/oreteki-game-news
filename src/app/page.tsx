@@ -24,7 +24,7 @@ export default async function Home() {
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(234,88,12,0.15),transparent_50%)]" />
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,rgba(220,38,38,0.1),transparent_50%)]" />
 
-          <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-12">
+          <div className="mx-auto max-w-[1400px] px-4 py-8 sm:px-6 sm:py-12">
             <div className="mb-6 flex items-center gap-2">
               <Flame className="h-5 w-5 text-orange-400" />
               <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">
@@ -199,7 +199,7 @@ export default async function Home() {
       )}
 
       {/* Main Content + Sidebar */}
-      <section className="mx-auto max-w-7xl px-4 py-10 sm:px-6 sm:py-14">
+      <section className="mx-auto max-w-[1400px] px-4 py-10 sm:px-6 sm:py-14">
         <div className="flex flex-col gap-10 lg:flex-row">
           <div className="flex-1">
             <div className="mb-6 flex items-center justify-between">

@@ -28,16 +28,16 @@ export function Header() {
             {/* Top accent bar */}
             <div className="h-1 w-full bg-gradient-to-r from-orange-500 via-red-500 to-pink-500" />
 
-            <div className="mx-auto max-w-7xl px-4 sm:px-6">
-                <div className="flex h-16 items-center justify-between">
+            <div className="mx-auto max-w-[1400px] px-4 sm:px-6">
+                <div className="flex h-20 items-center justify-between">
                     {/* Logo */}
-                    <Link href="/" className="flex items-center gap-2 group">
+                    <Link href="/" className="relative z-10 flex items-center group -ml-6">
                         <Image
                             src="/logo.png"
                             alt="俺的ゲームニュース"
-                            width={240}
-                            height={48}
-                            className="h-12 w-auto transition-transform group-hover:scale-105"
+                            width={1200}
+                            height={240}
+                            className="h-48 sm:h-56 w-auto transition-transform group-hover:scale-105"
                             priority
                         />
                     </Link>
@@ -110,7 +110,7 @@ export function Header() {
             {/* Mobile Menu */}
             {mobileMenuOpen && (
                 <div className="border-t border-zinc-200 bg-white md:hidden dark:border-zinc-800 dark:bg-zinc-950">
-                    <nav className="mx-auto max-w-7xl space-y-1 px-4 py-3">
+                    <nav className="mx-auto max-w-[1400px] space-y-1 px-4 py-3">
                         {navItems.map((item) => (
                             <Link
                                 key={item.label}
