@@ -1,11 +1,13 @@
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Clock, User, ArrowLeft, Share2, Tag, Eye, ExternalLink } from "lucide-react";
+import { Clock, User, ArrowLeft, Tag, Eye, ExternalLink } from "lucide-react";
 import { getArticleBySlug, getPublishedArticles } from "@/data/articles";
 import { Sidebar } from "@/components/sidebar";
+import { ShareButton } from "@/components/share-button";
+import { formatViews } from "@/lib/format";
 
-export const revalidate = 60;
+export const revalidate = 0; // 常に最新データを取得
 
 export async function generateStaticParams() {
     const articles = await getPublishedArticles();
@@ -78,12 +80,12 @@ export default async function ArticlePage({
                             </div>
                             <div className="flex items-center gap-1.5 text-sm text-zinc-500 dark:text-zinc-400">
                                 <Eye className="h-4 w-4" />
-                                <span>{(article.views / 1000).toFixed(0)}K views</span>
+                                <span>{formatViews(article.views)} views</span>
                             </div>
-                            <button className="ml-auto flex items-center gap-1.5 rounded-lg border border-zinc-200 px-3 py-1.5 text-sm font-medium text-zinc-500 transition-colors hover:border-orange-300 hover:text-orange-600 dark:border-zinc-700 dark:text-zinc-400 dark:hover:border-orange-600 dark:hover:text-orange-400">
-                                <Share2 className="h-3.5 w-3.5" />
-                                共有
-                            </button>
+                            <ShareButton
+                                url={`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/articles/${slug}`}
+                                title={article.title}
+                            />
                         </div>
 
                         {/* Article Body */}

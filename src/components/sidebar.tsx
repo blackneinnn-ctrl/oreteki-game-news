@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Flame, TrendingUp } from "lucide-react";
 import { getPopularArticles } from "@/data/articles";
+import { formatViews } from "@/lib/format";
 
 export async function Sidebar() {
     const popular = await getPopularArticles(5);
@@ -38,7 +39,7 @@ export async function Sidebar() {
                                     <div className="mt-1 flex items-center gap-2">
                                         <TrendingUp className="h-3 w-3 text-zinc-400" />
                                         <span className="text-xs text-zinc-400">
-                                            {(article.views / 1000).toFixed(0)}K views
+                                            {formatViews(article.views)} views
                                         </span>
                                     </div>
                                 </div>

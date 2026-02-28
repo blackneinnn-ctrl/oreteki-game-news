@@ -17,6 +17,7 @@ export default function AdminPage() {
     // UI State
     const [viewMode, setViewMode] = useState<"list" | "editor">("list");
     const [activeTab, setActiveTab] = useState<"draft" | "published">("draft");
+    const [editorTab, setEditorTab] = useState<"edit" | "preview">("edit");
 
     // Editor State
     const [editingArticleId, setEditingArticleId] = useState<string | null>(null);
@@ -123,6 +124,7 @@ export default function AdminPage() {
             tags: "",
             image_url: "",
         });
+        setEditorTab("edit");
         setViewMode("editor");
     };
 
@@ -135,6 +137,7 @@ export default function AdminPage() {
             tags: article.tags.join(", "),
             image_url: article.image_url,
         });
+        setEditorTab("edit");
         setViewMode("editor");
     };
 
@@ -406,12 +409,47 @@ export default function AdminPage() {
 
                     {/* Content Body Input (HTML allowed) */}
                     <div className="relative group mt-8">
-                        <textarea
-                            value={editForm.content}
-                            onChange={(e) => setEditForm({ ...editForm, content: e.target.value })}
-                            placeholder="記事の本文を入力してください... (HTML使用可能)"
-                            className="min-h-[50vh] w-full resize-y bg-transparent text-base leading-loose text-zinc-800 outline-none placeholder:text-zinc-300 dark:text-zinc-200 dark:placeholder:text-zinc-700"
-                        />
+                        {/* Tab switcher */}
+                        <div className="flex gap-1 mb-4 rounded-lg bg-zinc-100 p-1 dark:bg-zinc-800 w-fit">
+                            <button
+                                onClick={() => setEditorTab("edit")}
+                                className={`rounded-md px-4 py-1.5 text-sm font-semibold transition-all ${editorTab === "edit"
+                                        ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-700 dark:text-white"
+                                        : "text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
+                                    }`}
+                            >
+                                ✏️ 編集
+                            </button>
+                            <button
+                                onClick={() => setEditorTab("preview")}
+                                className={`rounded-md px-4 py-1.5 text-sm font-semibold transition-all ${editorTab === "preview"
+                                        ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-700 dark:text-white"
+                                        : "text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
+                                    }`}
+                            >
+                                👁️ プレビュー
+                            </button>
+                        </div>
+
+                        {editorTab === "edit" ? (
+                            <textarea
+                                value={editForm.content}
+                                onChange={(e) => setEditForm({ ...editForm, content: e.target.value })}
+                                placeholder="記事の本文を入力してください... (HTML使用可能)"
+                                className="min-h-[50vh] w-full resize-y bg-transparent text-base leading-loose text-zinc-800 outline-none placeholder:text-zinc-300 dark:text-zinc-200 dark:placeholder:text-zinc-700"
+                            />
+                        ) : (
+                            <div className="min-h-[50vh] rounded-xl border border-zinc-200 bg-zinc-50 p-6 dark:border-zinc-800 dark:bg-zinc-900">
+                                {editForm.content ? (
+                                    <div
+                                        className="article-content text-zinc-700 dark:text-zinc-300"
+                                        dangerouslySetInnerHTML={{ __html: editForm.content }}
+                                    />
+                                ) : (
+                                    <p className="text-zinc-400 dark:text-zinc-600">本文がありません。編集タブで記事を書いてください。</p>
+                                )}
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>

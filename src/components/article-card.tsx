@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { Clock, Eye } from "lucide-react";
 import type { Article } from "@/lib/supabase";
+import { formatViews } from "@/lib/format";
 
 export function ArticleCard({ article }: { article: Article }) {
     const date = new Date(article.published_at ?? article.created_at).toLocaleDateString('ja-JP');
@@ -41,7 +42,7 @@ export function ArticleCard({ article }: { article: Article }) {
                     </div>
                     <div className="ml-auto flex items-center gap-1 text-zinc-400">
                         <Eye className="h-3 w-3" />
-                        <span className="text-xs">{(article.views / 1000).toFixed(0)}K</span>
+                        <span className="text-xs">{formatViews(article.views)}</span>
                     </div>
                 </div>
             </div>
