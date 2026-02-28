@@ -1,0 +1,114 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: "Inter", "Noto Sans JP", sans-serif;
+}
+
+:root {
+  --background: #fafafa;
+  --foreground: #18181b;
+}
+
+.dark {
+  --background: #09090b;
+  --foreground: #fafafa;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: "Inter", "Noto Sans JP", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Prose styles for article content */
+.article-content {
+  line-height: 1.9;
+  font-size: 1rem;
+}
+
+.article-content h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-top: 2.5rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid;
+  border-image: linear-gradient(to right, #ea580c, #dc2626) 1;
+}
+
+.dark .article-content h2 {
+  border-image: linear-gradient(to right, #f97316, #ef4444) 1;
+}
+
+.article-content h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-top: 2rem;
+  margin-bottom: 0.75rem;
+}
+
+.article-content p {
+  margin-bottom: 1.25rem;
+}
+
+.article-content blockquote {
+  border-left: 4px solid #ea580c;
+  background: linear-gradient(135deg, rgba(234, 88, 12, 0.05), rgba(220, 38, 38, 0.05));
+  padding: 1.25rem 1.5rem;
+  margin: 2rem 0;
+  border-radius: 0 0.75rem 0.75rem 0;
+  font-style: italic;
+  color: #52525b;
+}
+
+.dark .article-content blockquote {
+  background: linear-gradient(135deg, rgba(234, 88, 12, 0.1), rgba(220, 38, 38, 0.1));
+  color: #a1a1aa;
+}
+
+.article-content img {
+  border-radius: 1rem;
+  margin: 1.5rem 0;
+  width: 100%;
+}
+
+.article-content a {
+  color: #ea580c;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.dark .article-content a {
+  color: #fb923c;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #a1a1aa;
+  border-radius: 4px;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #3f3f46;
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
