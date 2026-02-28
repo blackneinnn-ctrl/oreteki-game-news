@@ -9,8 +9,8 @@ import {
     Moon,
     Menu,
     X,
-    Gamepad2,
 } from "lucide-react";
+import Image from "next/image";
 
 const navItems = [
     { label: "ホーム", href: "/" },
@@ -32,17 +32,14 @@ export function Header() {
                 <div className="flex h-16 items-center justify-between">
                     {/* Logo */}
                     <Link href="/" className="flex items-center gap-2 group">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-orange-500 to-red-600 shadow-lg shadow-orange-500/25 transition-transform group-hover:scale-110">
-                            <Gamepad2 className="h-5 w-5 text-white" />
-                        </div>
-                        <div className="flex flex-col">
-                            <span className="text-lg font-bold leading-tight tracking-tight text-zinc-900 dark:text-white">
-                                俺的<span className="text-orange-600 dark:text-orange-400">ゲームニュース</span>
-                            </span>
-                            <span className="text-[10px] font-medium tracking-widest text-zinc-400 dark:text-zinc-500">
-                                GAME NEWS BLOG
-                            </span>
-                        </div>
+                        <Image
+                            src="/logo.png"
+                            alt="俺的ゲームニュース"
+                            width={240}
+                            height={48}
+                            className="h-12 w-auto transition-transform group-hover:scale-105"
+                            priority
+                        />
                     </Link>
 
                     {/* Desktop Navigation */}
