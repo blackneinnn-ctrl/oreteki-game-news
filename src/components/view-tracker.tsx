@@ -1,13 +1,18 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 
 export function ViewTracker({ articleId }: { articleId: string }) {
-    const tracked = useRef(false);
-
     useEffect(() => {
-        if (tracked.current) return;
-        tracked.current = true;
+        const key = `viewed_${articleId}`;
+
+        // sessionStorageで同一セッション内の二重カウントを防止
+        try {
+            if (sessionStorage.getItem(key)) return;
+            sessionStorage.setItem(key, "1");
+        } catch {
+            // private browsing等でsessionStorageが使えない場合はそのまま進む
+        }
 
         fetch("/api/views", {
             method: "POST",
