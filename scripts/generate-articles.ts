@@ -4,6 +4,7 @@ config({ path: '.env.local' });
 import RSSParser from 'rss-parser';
 import { GoogleGenAI } from '@google/genai';
 import { createClient } from '@supabase/supabase-js';
+import * as cheerio from 'cheerio';
 
 // ---- Config ----
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -173,7 +174,7 @@ async function generateArticle(news: NewsItem, retries = 3): Promise<{
 
 ## リッチメディアの抽出・フォールバック
 - リサーチ中に発見した**YouTubeの公式動画URL**があれば \`youtubeUrl\` に含めてください。「確実に外部サイト（iframe）で埋め込み再生できる公式動画」のみ対象とします（年齢制限や限定公開のものは不可）。公式トレーラーがなければ、ティザー映像やPV（プロモーションビデオ）、実機プレイ映像など、公式が公開している何らかの関連動画を諦めずに探して設定してください。
-- どうしても見つからない場合のみ \`youtubeUrl\` は空文字にし、代わりに公式の**メイン画像（キービジュアルや高画質なスクリーンショット）**のURLをリサーチして \`mainImageUrl\` に含めてください。
+- YouTube動画が見つからない場合は \`youtubeUrl\` は空文字にしてください。
 - **SteamのストアページURL**があれば \`steamUrl\` に含めてください。ただし、リサーチ元の情報内に「明確にそのゲーム本編のSteamストアへのリンク」が記載されている場合のみ抽出し、検索して適当なURLを推測することは**絶対にやめてください**（全く別のゲームのURLを出力する事故を防ぐため）。少しでも不確かな場合は必ず空文字にしてください。
 
 ## 参照ソースの抽出
@@ -183,9 +184,9 @@ async function generateArticle(news: NewsItem, retries = 3): Promise<{
 - 本文はHTMLで書く（h2, p, a, ul, liタグを使用）
 - 事実に基づいた精度の高い執筆を行うこと
 - 決して「この記事はAIが生成しました」といった文言はいれないこと
-- 文章ばかりにならないよう、話題ごとに内容に沿う**公式の画像（スクリーンショットなど）**のURLをリサーチし、本文HTML (\`content\`) の中で \`<img src="..." alt="..." class="w-full rounded-xl my-6">\` の形式で適宜追加してください。1つの情報元に画像がなくても諦めず、指定された全てのソース（国内外メディア、公式Xなど）を徹底的に辿って、必ず何らかの公式画像を見つけ出して挿入してください。
 - （注意）YouTubeやSteamの埋め込みタグはシステム側で自動付与するため、本文HTML (\`content\`) の中には絶対に \`iframe\` を書かないでください。
-- （超重要）指定する全ての画像URLおよび動画URLは、必ず「現在アクセス可能で実在する公式リンク」を記載してください。適当な外部サイトのURLや架空のURL（ハルシネーション）は絶対に使用しないでください。確証がない場合は空文字にしてください。
+- （超重要）指定する動画URL(\`youtubeUrl\`)は、必ず「現在アクセス可能で実在する公式リンク」を記載してください。適当な外部サイトのURLや架空のURL（ハルシネーション）は絶対に使用しないでください。確証がない場合は空文字にしてください。
+- （絶対事項）画像についてのハルシネーションを防ぐため、本文HTML (\`content\`) の中には「**絶対に \`<img>\` タグを含めない**」でください。システム側で自動的に挿入します。
 
 ## ニュース情報
 タイトル: ${news.title}
@@ -197,10 +198,9 @@ URL: ${news.link || 'なし (キーワード指定)'}
 {
   "title": "読者の興味を引くタイトル（煽りすぎず、キャッチーに）",
   "excerpt": "記事の要約（1-2文、100文字以内）",
-  "content": "<p>導入文</p><h2>見出し</h2><p>本文</p><img src='...'>...",
+  "content": "<p>導入文</p><h2>見出し</h2><p>本文</p>...",
   "tags": ["タグ1", "タグ2", "タグ3"],
   "youtubeUrl": "https://www.youtube.com/watch?v=...",
-  "mainImageUrl": "https://...",
   "steamUrl": "https://store.steampowered.com/app/...",
   "references": [
     { "title": "参考記事のタイトル", "url": "https://..." }
@@ -231,45 +231,82 @@ JSONのみを出力してください。マークダウンのコードブロッ�
                     parsed.youtubeUrl = '';
                 }
             }
-            if (parsed.mainImageUrl) {
-                const isValid = await isUrlValid(parsed.mainImageUrl, true);
-                if (!isValid) {
-                    console.log(`  ⚠️ メイン画像URLが無効です: ${parsed.mainImageUrl}`);
-                    parsed.mainImageUrl = '';
-                }
-            }
+            // 画像URLのスクレイピング抽出 (OGP)
+            const validImageUrls: string[] = [];
+            if (parsed.references && Array.isArray(parsed.references)) {
+                for (const ref of parsed.references) {
+                    if (!ref.url) continue;
+                    try {
+                        const controller = new AbortController();
+                        const timeoutId = setTimeout(() => controller.abort(), 5000);
+                        const res = await fetch(ref.url, { headers: FETCH_HEADERS, signal: controller.signal });
+                        clearTimeout(timeoutId);
+                        if (!res.ok) continue;
 
-            // 記事内の画像URL検証
-            if (parsed.content) {
-                const imgRegex = /<img[^>]+src=["']([^"']+)["'][^>]*>/g;
-                const invalidImgs: string[] = [];
-                const imgMatches = [...parsed.content.matchAll(imgRegex)];
-                for (const m of imgMatches) {
-                    const src = m[1];
-                    const isValid = await isUrlValid(src, true);
-                    if (!isValid) {
-                        console.log(`  ⚠️ 記事内画像URLが無効のため除外します: ${src}`);
-                        invalidImgs.push(m[0]);
+                        const html = await res.text();
+                        const $ = cheerio.load(html);
+                        let ogImage = $('meta[property="og:image"]').attr('content') || $('meta[name="og:image"]').attr('content');
+
+                        if (ogImage && !validImageUrls.includes(ogImage)) {
+                            // 相対パスの場合は絶対パスに変換
+                            if (ogImage.startsWith('/')) {
+                                const urlObj = new URL(ref.url);
+                                ogImage = urlObj.origin + ogImage;
+                            }
+                            const isValid = await isUrlValid(ogImage, true);
+                            if (isValid) {
+                                validImageUrls.push(ogImage);
+                                if (validImageUrls.length >= 3) break; // 最大3枚まで
+                            }
+                        }
+                    } catch (e) {
+                        // エラーは無視して次のURLへ
                     }
-                }
-                for (const invalidImg of invalidImgs) {
-                    parsed.content = parsed.content.replace(invalidImg, '');
                 }
             }
 
             let finalContent = '';
+            let mainImageUrl = '';
+
+            if (validImageUrls.length > 0) {
+                mainImageUrl = validImageUrls.shift()!;
+                console.log(`  📸 メイン画像を取得しました: ${mainImageUrl}`);
+            }
 
             // YouTubeが抽出されていれば冒頭に埋め込み、なければメイン画像を挿入
             if (parsed.youtubeUrl) {
                 const videoIdMatch = parsed.youtubeUrl.match(/(?:v=|youtu\.be\/)([^&]+)/);
                 if (videoIdMatch && videoIdMatch[1]) {
                     finalContent += `<div class="aspect-video mb-8 w-full overflow-hidden rounded-xl bg-zinc-100 dark:bg-zinc-800"><iframe width="100%" height="100%" src="https://www.youtube.com/embed/${videoIdMatch[1]}" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div>\n`;
+
+                    // YouTubeサムネイルをフォールバックに設定
+                    if (!mainImageUrl) {
+                        mainImageUrl = `https://img.youtube.com/vi/${videoIdMatch[1]}/maxresdefault.jpg`;
+                        console.log(`  📸 YouTubeサムネイルをメイン画像に代用します: ${mainImageUrl}`);
+                    }
                 }
-            } else if (parsed.mainImageUrl) {
-                finalContent += `<div class="mb-8 w-full overflow-hidden rounded-xl bg-zinc-100 dark:bg-zinc-800"><img src="${parsed.mainImageUrl}" alt="Main Image" class="w-full h-auto object-cover max-h-[60vh]"></div>\n`;
+            } else if (mainImageUrl) {
+                finalContent += `<div class="mb-8 w-full overflow-hidden rounded-xl bg-zinc-100 dark:bg-zinc-800"><img src="${mainImageUrl}" alt="Main Image" class="w-full h-auto object-cover max-h-[60vh]"></div>\n`;
             }
 
-            finalContent += parsed.content;
+            // 記事本文の <h2> の直前に残りの画像を順番に挿入
+            let contentWithImages = parsed.content;
+            if (validImageUrls.length > 0) {
+                console.log(`  🖼️ 記事内に ${validImageUrls.length} 枚の画像を挿入します`);
+                let imgIndex = 0;
+                contentWithImages = contentWithImages.replace(/<h2>/g, (match: string) => {
+                    if (validImageUrls[imgIndex]) {
+                        const imgTag = `<img src="${validImageUrls[imgIndex]}" alt="Article Image" class="w-full rounded-xl my-6">\n`;
+                        imgIndex++;
+                        return imgTag + match;
+                    }
+                    return match;
+                });
+            } else {
+                console.log(`  ⚠️ 挿入できる追加の画像が見つかりませんでした。`);
+            }
+
+            finalContent += contentWithImages;
 
             // Steamが抽出されていれば末尾に埋め込み
             if (parsed.steamUrl) {
@@ -298,7 +335,7 @@ JSONのみを出力してください。マークダウンのコードブロッ�
                 content: finalContent,
                 tags: parsed.tags || [],
                 slug: slugify(parsed.title) || `news-${Date.now()}`,
-                mainImageUrl: parsed.mainImageUrl || '',
+                mainImageUrl: mainImageUrl
             };
         } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
