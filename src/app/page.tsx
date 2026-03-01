@@ -1,10 +1,9 @@
 import Link from "next/link";
 import Image from "next/image";
-import { Clock, ChevronRight, Flame, Eye } from "lucide-react";
+import { Clock, ChevronRight, Flame } from "lucide-react";
 import { getPublishedArticles, getFeaturedArticles } from "@/data/articles";
 import { ArticleCard } from "@/components/article-card";
 import { Sidebar } from "@/components/sidebar";
-import { formatViews } from "@/lib/format";
 
 export const revalidate = 0; // 常に最新データを取得
 
@@ -64,10 +63,6 @@ export default async function Home() {
                         <Clock className="h-3 w-3" />
                         <time>{new Date(featured[0].published_at ?? featured[0].created_at).toLocaleDateString('ja-JP')}</time>
                       </div>
-                      <div className="flex items-center gap-1">
-                        <Eye className="h-3 w-3" />
-                        <span>{formatViews(featured[0].views)}</span>
-                      </div>
                     </div>
                   </div>
                 </div>
@@ -107,10 +102,6 @@ export default async function Home() {
                           <div className="flex items-center gap-1">
                             <Clock className="h-3 w-3" />
                             <time>{new Date(article.published_at ?? article.created_at).toLocaleDateString('ja-JP')}</time>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Eye className="h-3 w-3" />
-                            <span>{formatViews(article.views)}</span>
                           </div>
                         </div>
                       </div>
@@ -153,10 +144,6 @@ export default async function Home() {
                           <Clock className="h-3 w-3" />
                           <time>{new Date(featured[0].published_at ?? featured[0].created_at).toLocaleDateString('ja-JP')}</time>
                         </div>
-                        <div className="flex items-center gap-1">
-                          <Eye className="h-3 w-3" />
-                          <span>{formatViews(featured[0].views)}</span>
-                        </div>
                       </div>
                     </div>
                   </div>
@@ -185,8 +172,6 @@ export default async function Home() {
                         <div className="mt-2 flex items-center gap-2 text-xs text-zinc-400">
                           <Clock className="h-3 w-3" />
                           <time>{new Date(article.published_at ?? article.created_at).toLocaleDateString('ja-JP')}</time>
-                          <Eye className="h-3 w-3 ml-1" />
-                          <span>{formatViews(article.views)}</span>
                         </div>
                       </div>
                     </div>

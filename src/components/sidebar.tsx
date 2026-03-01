@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { Flame, TrendingUp } from "lucide-react";
 import { getPopularArticles } from "@/data/articles";
-import { formatViews } from "@/lib/format";
 
 export async function Sidebar() {
     const popular = await getPopularArticles(5);
@@ -36,12 +35,6 @@ export async function Sidebar() {
                                     <p className="line-clamp-2 text-sm font-medium leading-snug text-zinc-700 transition-colors group-hover:text-orange-600 dark:text-zinc-300 dark:group-hover:text-orange-400">
                                         {article.title}
                                     </p>
-                                    <div className="mt-1 flex items-center gap-2">
-                                        <TrendingUp className="h-3 w-3 text-zinc-400" />
-                                        <span className="text-xs text-zinc-400">
-                                            {formatViews(article.views)} views
-                                        </span>
-                                    </div>
                                 </div>
                             </Link>
                         </li>

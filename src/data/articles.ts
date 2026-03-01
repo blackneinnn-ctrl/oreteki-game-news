@@ -110,6 +110,22 @@ export async function deleteArticle(id: string): Promise<boolean> {
   return true;
 }
 
+// 複数記事を一括削除
+export async function deleteArticles(ids: string[]): Promise<boolean> {
+  if (!ids.length) return true;
+
+  const { error } = await supabase
+    .from('articles')
+    .delete()
+    .in('id', ids);
+
+  if (error) {
+    console.error('Error deleting multiple articles:', error);
+    return false;
+  }
+  return true;
+}
+
 // 記事を編集
 export async function updateArticle(id: string, updates: {
   title?: string;

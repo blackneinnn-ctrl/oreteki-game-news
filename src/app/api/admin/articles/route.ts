@@ -1,19 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAllArticles, updateArticleStatus, deleteArticle, updateArticle, createArticle } from '@/data/articles';
-
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
-
-function checkAuth(request: NextRequest): boolean {
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader) return false;
-    const password = authHeader.replace('Bearer ', '');
-    return password === ADMIN_PASSWORD;
-}
+import { getAllArticles, updateArticleStatus, deleteArticle, deleteArticles, updateArticle, createArticle } from '@/data/articles';
 
 export async function GET(request: NextRequest) {
-    if (!checkAuth(request)) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
 
     const articles = await getAllArticles();
     return NextResponse.json(articles);
@@ -21,9 +9,6 @@ export async function GET(request: NextRequest) {
 
 // ステータス変更
 export async function PATCH(request: NextRequest) {
-    if (!checkAuth(request)) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
 
     const { id, status } = await request.json();
     if (!id || !['draft', 'published'].includes(status)) {
@@ -40,9 +25,6 @@ export async function PATCH(request: NextRequest) {
 
 // 記事の内容を編集
 export async function PUT(request: NextRequest) {
-    if (!checkAuth(request)) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
 
     const { id, title, excerpt, content, tags, image_url } = await request.json();
     if (!id) {
@@ -66,9 +48,6 @@ export async function PUT(request: NextRequest) {
 
 // 新規記事を作成
 export async function POST(request: NextRequest) {
-    if (!checkAuth(request)) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
 
     const { title, excerpt, content, tags, image_url, status } = await request.json();
     if (!title || !content) {
@@ -92,11 +71,19 @@ export async function POST(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-    if (!checkAuth(request)) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const { id, ids } = await request.json();
+
+    if (ids && Array.isArray(ids)) {
+        if (ids.length === 0) return NextResponse.json({ success: true });
+
+        const success = await deleteArticles(ids);
+        if (!success) {
+            return NextResponse.json({ error: 'Failed to delete multiple items' }, { status: 500 });
+        }
+        return NextResponse.json({ success: true });
     }
 
-    const { id } = await request.json();
     if (!id) {
         return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
     }

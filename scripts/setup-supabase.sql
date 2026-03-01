@@ -46,3 +46,26 @@ CREATE POLICY "Allow all operations with anon key"
   ON articles FOR ALL
   USING (true)
   WITH CHECK (true);
+
+-- API使用量記録テーブル
+CREATE TABLE api_usage (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  model TEXT NOT NULL,
+  input_tokens INTEGER NOT NULL,
+  output_tokens INTEGER NOT NULL,
+  operation TEXT NOT NULL
+);
+
+-- RLS
+ALTER TABLE api_usage ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow select usage to everyone"
+  ON api_usage FOR SELECT
+  USING (true);
+
+CREATE POLICY "Allow insert usage with anon key"
+  ON api_usage FOR INSERT
+  WITH CHECK (true);
+
+CREATE INDEX idx_api_usage_created_at ON api_usage(created_at DESC);

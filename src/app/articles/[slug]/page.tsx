@@ -1,12 +1,11 @@
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Clock, User, ArrowLeft, Tag, Eye, ExternalLink } from "lucide-react";
+import { Clock, User, ArrowLeft, Tag, ExternalLink } from "lucide-react";
 import { getArticleBySlug, getPublishedArticles } from "@/data/articles";
 import { Sidebar } from "@/components/sidebar";
 import { ShareButton } from "@/components/share-button";
 import { ViewTracker } from "@/components/view-tracker";
-import { formatViews } from "@/lib/format";
 
 export const revalidate = 0; // 常に最新データを取得
 
@@ -79,10 +78,6 @@ export default async function ArticlePage({
                             <div className="flex items-center gap-1.5 text-sm text-zinc-500 dark:text-zinc-400">
                                 <Clock className="h-4 w-4" />
                                 <time>{date}</time>
-                            </div>
-                            <div className="flex items-center gap-1.5 text-sm text-zinc-500 dark:text-zinc-400">
-                                <Eye className="h-4 w-4" />
-                                <span>{formatViews(article.views)} views</span>
                             </div>
                             <ShareButton
                                 url={`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/articles/${slug}`}

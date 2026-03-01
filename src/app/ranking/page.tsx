@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { Trophy, Eye, Clock, ArrowLeft } from "lucide-react";
+import { Trophy, Clock, ArrowLeft } from "lucide-react";
 import { getPopularArticles } from "@/data/articles";
 import type { Metadata } from "next";
 
@@ -49,12 +49,12 @@ export default async function RankingPage() {
                         <div className="flex flex-col items-center justify-center">
                             <span
                                 className={`flex h-10 w-10 items-center justify-center rounded-xl text-base font-extrabold sm:h-12 sm:w-12 sm:text-lg ${index === 0
-                                        ? "bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow-md shadow-amber-400/30"
-                                        : index === 1
-                                            ? "bg-gradient-to-br from-zinc-300 to-zinc-400 text-white dark:from-zinc-500 dark:to-zinc-600"
-                                            : index === 2
-                                                ? "bg-gradient-to-br from-amber-600 to-amber-700 text-white"
-                                                : "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400"
+                                    ? "bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow-md shadow-amber-400/30"
+                                    : index === 1
+                                        ? "bg-gradient-to-br from-zinc-300 to-zinc-400 text-white dark:from-zinc-500 dark:to-zinc-600"
+                                        : index === 2
+                                            ? "bg-gradient-to-br from-amber-600 to-amber-700 text-white"
+                                            : "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400"
                                     }`}
                             >
                                 {index + 1}
@@ -79,12 +79,6 @@ export default async function RankingPage() {
                                 {article.excerpt}
                             </p>
                             <div className="mt-2 flex items-center gap-3 text-xs text-zinc-400">
-                                <div className="flex items-center gap-1">
-                                    <Eye className="h-3 w-3" />
-                                    <span className="font-semibold text-orange-600 dark:text-orange-400">
-                                        {article.views.toLocaleString()} views
-                                    </span>
-                                </div>
                                 <div className="flex items-center gap-1">
                                     <Clock className="h-3 w-3" />
                                     <time>{new Date(article.published_at ?? article.created_at).toLocaleDateString('ja-JP')}</time>
