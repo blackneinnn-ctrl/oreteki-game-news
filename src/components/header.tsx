@@ -31,13 +31,13 @@ export function Header() {
             <div className="mx-auto max-w-[1400px] px-4 sm:px-6">
                 <div className="flex h-20 items-center justify-between">
                     {/* Logo */}
-                    <Link href="/" className="relative z-10 flex items-center group -ml-6">
+                    <Link href="/" className="relative z-10 flex h-20 w-[400px] items-center overflow-hidden group">
                         <Image
                             src="/logo.png"
                             alt="俺的ゲームニュース"
                             width={1200}
                             height={240}
-                            className="h-48 sm:h-56 w-auto transition-transform group-hover:scale-105"
+                            className="h-[500px] w-auto object-contain transition-transform group-hover:scale-105"
                             priority
                         />
                     </Link>
