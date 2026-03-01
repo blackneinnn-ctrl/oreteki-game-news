@@ -2,11 +2,8 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { useTheme } from "next-themes";
 import {
     Search,
-    Sun,
-    Moon,
     Menu,
     X,
 } from "lucide-react";
@@ -21,10 +18,9 @@ const navItems = [
 export function Header() {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [searchOpen, setSearchOpen] = useState(false);
-    const { theme, setTheme } = useTheme();
 
     return (
-        <header className="sticky top-0 z-50 border-b border-zinc-200 bg-white/80 backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-950/80">
+        <header className="sticky top-0 z-50 border-b border-zinc-800 bg-zinc-950/80 backdrop-blur-xl">
             {/* Top accent bar */}
             <div className="h-1 w-full bg-gradient-to-r from-orange-500 via-red-500 to-pink-500" />
 
@@ -48,7 +44,7 @@ export function Header() {
                             <Link
                                 key={item.label}
                                 href={item.href}
-                                className="rounded-lg px-3 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white"
+                                className="rounded-lg px-3 py-2 text-sm font-medium text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-white"
                             >
                                 {item.label}
                             </Link>
@@ -60,26 +56,16 @@ export function Header() {
                         {/* Search */}
                         <button
                             onClick={() => setSearchOpen(!searchOpen)}
-                            className="flex h-9 w-9 items-center justify-center rounded-lg text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white"
+                            className="flex h-9 w-9 items-center justify-center rounded-lg text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-white"
                             aria-label="検索"
                         >
                             <Search className="h-4 w-4" />
                         </button>
 
-                        {/* Theme Toggle */}
-                        <button
-                            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-                            className="flex h-9 w-9 items-center justify-center rounded-lg text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white"
-                            aria-label="テーマ切り替え"
-                        >
-                            <Sun className="h-4 w-4 rotate-0 scale-100 transition-transform dark:-rotate-90 dark:scale-0" />
-                            <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-transform dark:rotate-0 dark:scale-100" />
-                        </button>
-
                         {/* Mobile Menu Toggle */}
                         <button
                             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                            className="flex h-9 w-9 items-center justify-center rounded-lg text-zinc-500 transition-colors hover:bg-zinc-100 md:hidden dark:text-zinc-400 dark:hover:bg-zinc-800"
+                            className="flex h-9 w-9 items-center justify-center rounded-lg text-zinc-400 transition-colors hover:bg-zinc-800 md:hidden"
                             aria-label="メニュー"
                         >
                             {mobileMenuOpen ? (
@@ -93,13 +79,13 @@ export function Header() {
 
                 {/* Search Bar (expandable) */}
                 {searchOpen && (
-                    <div className="border-t border-zinc-200 py-3 dark:border-zinc-800">
+                    <div className="border-t border-zinc-800 py-3">
                         <div className="relative">
                             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
                             <input
                                 type="text"
                                 placeholder="記事を検索..."
-                                className="w-full rounded-lg border border-zinc-200 bg-zinc-50 py-2 pl-10 pr-4 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white dark:placeholder:text-zinc-500"
+                                className="w-full rounded-lg border border-zinc-700 bg-zinc-900 py-2 pl-10 pr-4 text-sm text-white outline-none placeholder:text-zinc-500 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20"
                                 autoFocus
                             />
                         </div>
@@ -109,14 +95,14 @@ export function Header() {
 
             {/* Mobile Menu */}
             {mobileMenuOpen && (
-                <div className="border-t border-zinc-200 bg-white md:hidden dark:border-zinc-800 dark:bg-zinc-950">
+                <div className="border-t border-zinc-800 bg-zinc-950 md:hidden">
                     <nav className="mx-auto max-w-[1400px] space-y-1 px-4 py-3">
                         {navItems.map((item) => (
                             <Link
                                 key={item.label}
                                 href={item.href}
                                 onClick={() => setMobileMenuOpen(false)}
-                                className="block rounded-lg px-3 py-2.5 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white"
+                                className="block rounded-lg px-3 py-2.5 text-sm font-medium text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-white"
                             >
                                 {item.label}
                             </Link>
