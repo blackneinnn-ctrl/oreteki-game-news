@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { Trophy, Clock, ArrowLeft } from "lucide-react";
+import { Trophy, Clock, ArrowLeft, Eye } from "lucide-react";
 import { getPopularArticles } from "@/data/articles";
 import type { Metadata } from "next";
 
@@ -82,6 +82,10 @@ export default async function RankingPage() {
                                 <div className="flex items-center gap-1">
                                     <Clock className="h-3 w-3" />
                                     <time>{new Date(article.published_at ?? article.created_at).toLocaleDateString('ja-JP')}</time>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                    <Eye className="h-3 w-3" />
+                                    <span>{article.views.toLocaleString()} views</span>
                                 </div>
                             </div>
                         </div>

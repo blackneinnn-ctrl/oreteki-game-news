@@ -1,21 +1,18 @@
 import { config } from 'dotenv';
 config({ path: '.env.local' });
-
 import { GoogleGenAI } from '@google/genai';
+import fs from 'fs';
 
 async function main() {
-    console.log('Testing Gemini API key...');
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-
     try {
         const response = await ai.models.generateContent({
             model: 'gemini-3.1-pro-preview',
             contents: 'hello',
         });
-        console.log('Success!', response.text);
+        fs.writeFileSync('result.json', JSON.stringify({ success: true, text: response.text }), 'utf8');
     } catch (err: any) {
-        require('fs').writeFileSync('error.log', JSON.stringify({ message: err.message, status: err.status }));
+        fs.writeFileSync('result.json', JSON.stringify({ success: false, error: err.message, stack: err.stack }), 'utf8');
     }
 }
-
-main();
+main().catch(err => fs.writeFileSync('result.json', JSON.stringify({ success: false, error: err.message, type: 'uncaught' }), 'utf8'));

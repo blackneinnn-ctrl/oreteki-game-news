@@ -1,13 +1,20 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import {
     Shield, Eye, Trash2, Check, X, Clock, ExternalLink,
-    LogIn, RefreshCw, Pencil, Save, ArrowLeft, Plus, Send, Bot, User, CreditCard
+    LogIn, RefreshCw, Pencil, Save, ArrowLeft, Plus, Send, Bot, User, CreditCard,
+    Paperclip, ImageIcon
 } from "lucide-react";
 import type { Article } from "@/lib/supabase";
+import { EditorToolbar } from "@/components/editor-toolbar";
 
-export default function AdminPage() {
+function AdminDashboard() {
+    const searchParams = useSearchParams();
+    const router = useRouter();
+    const editIdParam = searchParams.get('edit');
+
     const [articles, setArticles] = useState<Article[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
@@ -29,36 +36,21 @@ export default function AdminPage() {
     const [editForm, setEditForm] = useState({
         title: "",
         excerpt: "",
-        content: "",
+        pages: [""] as string[],
         tags: "",
         image_url: "",
     });
+    const [currentEditorPageIndex, setCurrentEditorPageIndex] = useState(0);
     const [saving, setSaving] = useState(false);
     const [sortBy, setSortBy] = useState<"date" | "views">("date");
 
     // AI Edit Assistant State
-    const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'ai'; content: string }[]>([]);
+    const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'ai'; content: string; imagePreview?: string; showApplyButton?: boolean }[]>([]);
     const [chatInput, setChatInput] = useState("");
     const [isAssistantTyping, setIsAssistantTyping] = useState(false);
-    const [selectedModel, setSelectedModel] = useState("gemini-2.5-flash");
+    const [selectedModel, setSelectedModel] = useState("gemini-3-pro-preview");
     const [costData, setCostData] = useState<{ totalUsd: number; totalJpy: number } | null>(null);
-
-    const fetchArticles = useCallback(async () => {
-        setLoading(true);
-        setError("");
-        try {
-            const res = await fetch("/api/admin/articles");
-            if (!res.ok) {
-                throw new Error("Failed to fetch");
-            }
-            const data = await res.json();
-            setArticles(data);
-        } catch {
-            setError("記事の取得に失敗しました");
-        } finally {
-            setLoading(false);
-        }
-    }, []);
+    const [pendingImage, setPendingImage] = useState<{ data: string; mimeType: string; preview: string } | null>(null);
 
     const fetchCost = useCallback(async () => {
         try {
@@ -71,6 +63,60 @@ export default function AdminPage() {
             console.error('Failed to fetch cost stats:', e);
         }
     }, []);
+
+    const openEditorForEdit = useCallback((article: Article) => {
+        setEditingArticleId(article.id);
+        setEditForm({
+            title: article.title,
+            excerpt: article.excerpt,
+            pages: article.content ? article.content.split('<!-- PAGE_BREAK -->') : [""],
+            tags: article.tags.join(", "),
+            image_url: article.image_url,
+        });
+        setEditorTab("edit");
+        setCurrentEditorPageIndex(0);
+        setViewMode("editor");
+    }, []);
+
+    const fetchArticles = useCallback(async () => {
+        setLoading(true);
+        setError("");
+        try {
+            // Use cache: 'no-store' or a timestamp query parameter to bypass aggressive client-side caching
+            const res = await fetch(`/api/admin/articles?t=${Date.now()}`, {
+                cache: 'no-store'
+            });
+            if (!res.ok) {
+                throw new Error("Failed to fetch");
+            }
+            const data: Article[] = await res.json();
+            setArticles(data);
+
+            if (editIdParam) {
+                const articleToEdit = data.find(a => a.id === editIdParam);
+                if (articleToEdit) {
+                    setEditingArticleId(articleToEdit.id);
+                    setEditForm({
+                        title: articleToEdit.title,
+                        excerpt: articleToEdit.excerpt,
+                        pages: articleToEdit.content ? articleToEdit.content.split('<!-- PAGE_BREAK -->') : [""],
+                        tags: articleToEdit.tags.join(", "),
+                        image_url: articleToEdit.image_url,
+                    });
+                    setEditorTab("edit");
+                    setCurrentEditorPageIndex(0);
+                    setViewMode("editor");
+
+                    // Clean up URL parameters to prevent re-triggering navigation loops later
+                    router.replace('/admin', { scroll: false });
+                }
+            }
+        } catch {
+            setError("記事の取得に失敗しました");
+        } finally {
+            setLoading(false);
+        }
+    }, [editIdParam, router]);
 
     useEffect(() => {
         if (viewMode === "list") {
@@ -198,13 +244,25 @@ export default function AdminPage() {
     };
 
     // --- AI Edit Assistant ---
+    // Build conversation history for the API from current chat messages
+    const buildConversationHistory = () => {
+        return chatMessages
+            .filter(msg => !msg.showApplyButton || msg.role === 'ai') // include all messages
+            .map(msg => ({
+                role: msg.role === 'user' ? 'user' as const : 'model' as const,
+                text: msg.content
+            }));
+    };
+
     const handleAssistantSubmit = async (e?: React.FormEvent) => {
         if (e) e.preventDefault();
         if (!chatInput.trim() || isAssistantTyping) return;
 
         const userInstruction = chatInput.trim();
+        const imageToSend = pendingImage;
         setChatInput("");
-        setChatMessages(prev => [...prev, { role: 'user', content: userInstruction }]);
+        setPendingImage(null);
+        setChatMessages(prev => [...prev, { role: 'user', content: userInstruction, imagePreview: imageToSend?.preview }]);
         setIsAssistantTyping(true);
 
         try {
@@ -212,23 +270,22 @@ export default function AdminPage() {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    currentHtml: editForm.content,
+                    currentHtml: editForm.pages[currentEditorPageIndex] || "",
                     prompt: userInstruction,
-                    model: selectedModel
+                    model: selectedModel,
+                    mode: 'chat',
+                    image: imageToSend ? { data: imageToSend.data, mimeType: imageToSend.mimeType } : undefined,
+                    conversationHistory: buildConversationHistory()
                 }),
             });
 
             const data = await res.json();
 
             if (!res.ok) {
-                setChatMessages(prev => [...prev, { role: 'ai', content: `❌ エラー: ${data.error || '修正に失敗しました'}` }]);
+                setChatMessages(prev => [...prev, { role: 'ai', content: `❌ エラー: ${data.error || '処理に失敗しました'}` }]);
             } else {
-                setEditForm(prev => ({ ...prev, content: data.html }));
-                setChatMessages(prev => [...prev, { role: 'ai', content: '✅ 修正が完了しました！左側のエディタに反映されています。' }]);
-
-                // プレビュー表示に切り替えて変更を見やすくする
-                setEditorTab("preview");
-                fetchCost(); // 使用量が変わったのでコストを再取得
+                setChatMessages(prev => [...prev, { role: 'ai', content: data.message, showApplyButton: true }]);
+                fetchCost();
             }
         } catch (error) {
             setChatMessages(prev => [...prev, { role: 'ai', content: '❌ ネットワークエラーが発生しました。' }]);
@@ -237,30 +294,92 @@ export default function AdminPage() {
         }
     };
 
+    // Handle "Apply" button click - sends mode: 'apply' to actually modify HTML
+    const handleApplyChanges = async (messageIndex: number) => {
+        setIsAssistantTyping(true);
+
+        // Disable the apply button for the clicked message
+        setChatMessages(prev => prev.map((msg, i) => i === messageIndex ? { ...msg, showApplyButton: false } : msg));
+
+        try {
+            // Build history up to and including the message that was approved
+            const historyUpToApproval = chatMessages.slice(0, messageIndex + 1).map(msg => ({
+                role: msg.role === 'user' ? 'user' as const : 'model' as const,
+                text: msg.content
+            }));
+
+            const res = await fetch("/api/admin/edit-assistant", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    currentHtml: editForm.pages[currentEditorPageIndex] || "",
+                    prompt: '適用してください',
+                    model: selectedModel,
+                    mode: 'apply',
+                    conversationHistory: historyUpToApproval
+                }),
+            });
+
+            const data = await res.json();
+
+            if (!res.ok) {
+                setChatMessages(prev => [...prev, { role: 'ai', content: `❌ エラー: ${data.error || '適用に失敗しました'}` }]);
+            } else {
+                setEditForm(prev => {
+                    const newPages = [...prev.pages];
+                    newPages[currentEditorPageIndex] = data.html;
+                    return { ...prev, pages: newPages };
+                });
+                setChatMessages(prev => [...prev, { role: 'ai', content: data.message || '✅ 修正が完了しました！プレビューに反映されています。' }]);
+                setEditorTab("preview");
+                fetchCost();
+            }
+        } catch (error) {
+            setChatMessages(prev => [...prev, { role: 'ai', content: '❌ ネットワークエラーが発生しました。' }]);
+        } finally {
+            setIsAssistantTyping(false);
+        }
+    };
+
+    // Handle image selection for chat
+    const handleChatImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        // Check file size (max 10MB for Gemini inline data)
+        if (file.size > 10 * 1024 * 1024) {
+            setChatMessages(prev => [...prev, { role: 'ai', content: '❌ 画像サイズが10MBを超えています。もっと小さい画像を選択してください。' }]);
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = () => {
+            const result = reader.result as string;
+            // result is like "data:image/png;base64,iVBOR..."
+            const base64Data = result.split(',')[1];
+            const mimeType = file.type;
+            setPendingImage({
+                data: base64Data,
+                mimeType: mimeType,
+                preview: result // full data URL for preview
+            });
+        };
+        reader.readAsDataURL(file);
+        e.target.value = ''; // reset so same file can be selected again
+    };
+
     // --- Editor Actions ---
     const openEditorForNew = () => {
         setEditingArticleId(null);
         setEditForm({
             title: "",
             excerpt: "",
-            content: "",
+            pages: [""],
             tags: "",
             image_url: "",
         });
         setEditorTab("edit");
-        setViewMode("editor");
-    };
-
-    const openEditorForEdit = (article: Article) => {
-        setEditingArticleId(article.id);
-        setEditForm({
-            title: article.title,
-            excerpt: article.excerpt,
-            content: article.content,
-            tags: article.tags.join(", "),
-            image_url: article.image_url,
-        });
-        setEditorTab("edit");
+        setCurrentEditorPageIndex(0);
         setViewMode("editor");
     };
 
@@ -281,7 +400,7 @@ export default function AdminPage() {
             const payload: any = {
                 title: editForm.title,
                 excerpt: editForm.excerpt,
-                content: editForm.content,
+                content: editForm.pages.join('<!-- PAGE_BREAK -->'),
                 tags: editForm.tags.split(",").map((t) => t.trim()).filter(Boolean),
                 image_url: editForm.image_url,
             };
@@ -301,7 +420,20 @@ export default function AdminPage() {
             });
 
             if (res.ok) {
-                setViewMode("list");
+                const resData = await res.json();
+                if (!isEditing && resData.id) {
+                    setEditingArticleId(resData.id);
+                    router.replace(`/admin?edit=${resData.id}`, { scroll: false });
+                }
+
+                // Refresh article list in the background
+                fetchArticles();
+
+                // Show temporary success feedback
+                const successMsg = isEditing ? "✅ 上書き保存しました" : "✅ 保存しました";
+                setError(""); // Clear any previous errors
+                setChatMessages(prev => [...prev, { role: 'ai', content: successMsg }]);
+
             } else {
                 setError("保存に失敗しました");
             }
@@ -339,6 +471,15 @@ export default function AdminPage() {
                         戻る
                     </button>
                     <div className="flex items-center gap-3">
+                        {editingArticleId && (
+                            <a
+                                href={`/admin/preview/${editingArticleId}`}
+                                className="flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                            >
+                                <Eye className="h-4 w-4" />
+                                プレビュー
+                            </a>
+                        )}
                         <button
                             onClick={() => handleSave("draft")}
                             disabled={saving}
@@ -494,6 +635,48 @@ export default function AdminPage() {
 
                         {/* Content Body Input (HTML allowed) */}
                         <div className="relative group mt-8">
+                            {/* Page Tabs */}
+                            <div className="flex flex-wrap items-center gap-2 mb-4">
+                                {editForm.pages.map((_, index) => (
+                                    <div key={index} className="flex items-center">
+                                        <button
+                                            onClick={() => setCurrentEditorPageIndex(index)}
+                                            className={`px-4 py-2 text-sm font-semibold rounded-t-lg transition-colors ${currentEditorPageIndex === index
+                                                ? "bg-white text-orange-600 border-t-2 border-orange-500 shadow-[0_-2px_4px_rgba(0,0,0,0.02)] dark:bg-zinc-900 dark:border-orange-500"
+                                                : "bg-zinc-100 text-zinc-500 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
+                                                }`}
+                                        >
+                                            ページ {index + 1}
+                                        </button>
+                                        {editForm.pages.length > 1 && index === currentEditorPageIndex && (
+                                            <button
+                                                onClick={() => {
+                                                    if (confirm(`ページ ${index + 1} を削除しますか？`)) {
+                                                        const newPages = editForm.pages.filter((_, i) => i !== index);
+                                                        setEditForm({ ...editForm, pages: newPages });
+                                                        setCurrentEditorPageIndex(Math.max(0, index - 1));
+                                                    }
+                                                }}
+                                                className="ml-1 p-1 text-zinc-400 hover:text-red-500 transition-colors"
+                                                title="このページを削除"
+                                            >
+                                                <X className="w-4 h-4" />
+                                            </button>
+                                        )}
+                                    </div>
+                                ))}
+                                <button
+                                    onClick={() => {
+                                        setEditForm({ ...editForm, pages: [...editForm.pages, ""] });
+                                        setCurrentEditorPageIndex(editForm.pages.length);
+                                    }}
+                                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-zinc-600 bg-white border border-zinc-200 rounded-lg hover:bg-zinc-50 dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                                >
+                                    <Plus className="w-3 h-3" />
+                                    ページを追加
+                                </button>
+                            </div>
+
                             {/* Tab switcher */}
                             <div className="flex gap-1 mb-4 rounded-lg bg-zinc-100 p-1 dark:bg-zinc-800 w-fit">
                                 <button
@@ -516,35 +699,54 @@ export default function AdminPage() {
                                 </button>
                             </div>
 
-                            {editorTab === "edit" ? (
-                                <textarea
-                                    value={editForm.content}
-                                    onChange={(e) => setEditForm({ ...editForm, content: e.target.value })}
-                                    placeholder="記事の本文を入力してください... (HTML使用可能)"
-                                    className="min-h-[50vh] w-full resize-y bg-transparent text-base leading-loose text-zinc-800 outline-none placeholder:text-zinc-300 dark:text-zinc-200 dark:placeholder:text-zinc-700"
-                                />
-                            ) : (
-                                <div className="min-h-[50vh] rounded-xl border border-zinc-200 bg-zinc-50 p-6 dark:border-zinc-800 dark:bg-zinc-900 relative">
-                                    <div className="absolute top-2 right-4 text-[10px] font-bold text-zinc-400 dark:text-zinc-600 uppercase tracking-widest flex items-center gap-1.5 pointer-events-none">
-                                        <Pencil className="w-3 h-3" />
-                                        直接編集モード
+                            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-b-xl rounded-tr-xl p-0">
+                                {editorTab === "edit" ? (
+                                    <textarea
+                                        value={editForm.pages[currentEditorPageIndex] || ""}
+                                        onChange={(e) => {
+                                            const newPages = [...editForm.pages];
+                                            newPages[currentEditorPageIndex] = e.target.value;
+                                            setEditForm({ ...editForm, pages: newPages });
+                                        }}
+                                        placeholder={`ページ ${currentEditorPageIndex + 1} の本文を入力してください... (HTML使用可能)`}
+                                        className="min-h-[50vh] w-full resize-y bg-transparent p-6 text-base leading-loose text-zinc-800 outline-none placeholder:text-zinc-300 dark:text-zinc-200 dark:placeholder:text-zinc-700"
+                                    />
+                                ) : (
+                                    <div className="min-h-[50vh] bg-zinc-50 p-6 dark:bg-zinc-900/50 relative">
+                                        <div className="absolute top-2 right-4 text-[10px] font-bold text-zinc-400 dark:text-zinc-600 uppercase tracking-widest flex items-center gap-1.5 pointer-events-none">
+                                            <Pencil className="w-3 h-3" />
+                                            直接編集モード
+                                        </div>
+
+                                        <EditorToolbar className="top-20 mt-4 mb-4 lg:mt-0" />
+
+                                        {editForm.pages[currentEditorPageIndex] ? (
+                                            <div
+                                                contentEditable={true}
+                                                suppressContentEditableWarning={true}
+                                                onBlur={(e) => {
+                                                    const newContent = e.currentTarget.innerHTML;
+                                                    const newPages = [...editForm.pages];
+                                                    newPages[currentEditorPageIndex] = newContent;
+                                                    setEditForm({ ...editForm, pages: newPages });
+                                                }}
+                                                onKeyDown={(e) => {
+                                                    // Prevent default Enter behavior (which usually creates a new <p> or <div>)
+                                                    // and insert a <br> instead for a single line break
+                                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                                        e.preventDefault();
+                                                        document.execCommand('insertLineBreak');
+                                                    }
+                                                }}
+                                                className="article-content text-zinc-700 dark:text-zinc-300 outline-none focus:ring-2 focus:ring-orange-500/10 rounded-lg p-2 transition-all min-h-[40vh]"
+                                                dangerouslySetInnerHTML={{ __html: editForm.pages[currentEditorPageIndex] }}
+                                            />
+                                        ) : (
+                                            <p className="text-zinc-400 dark:text-zinc-600">本文がありません。編集タブで記事を書いてください。</p>
+                                        )}
                                     </div>
-                                    {editForm.content ? (
-                                        <div
-                                            contentEditable={true}
-                                            suppressContentEditableWarning={true}
-                                            onBlur={(e) => {
-                                                const newContent = e.currentTarget.innerHTML;
-                                                setEditForm(prev => ({ ...prev, content: newContent }));
-                                            }}
-                                            className="article-content text-zinc-700 dark:text-zinc-300 outline-none focus:ring-2 focus:ring-orange-500/10 rounded-lg p-2 transition-all min-h-[40vh]"
-                                            dangerouslySetInnerHTML={{ __html: editForm.content }}
-                                        />
-                                    ) : (
-                                        <p className="text-zinc-400 dark:text-zinc-600">本文がありません。編集タブで記事を書いてください。</p>
-                                    )}
-                                </div>
-                            )}
+                                )}
+                            </div>
                         </div>
                     </div>
 
@@ -565,7 +767,7 @@ export default function AdminPage() {
                             >
                                 <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
                                 <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
-                                <option value="gemini-3-pro-3.1">Gemini 3 Pro 3.1</option>
+                                <option value="gemini-3-pro-preview">Gemini 3 Pro (Preview)</option>
                             </select>
                         </div>
 
@@ -576,6 +778,7 @@ export default function AdminPage() {
                                     <p>「箇条書きにして」</p>
                                     <p>「もっとワクワクする表現にして」</p>
                                     <p>など、HTMLの修正を会話で指示できます。</p>
+                                    <p className="mt-2 text-xs text-zinc-300 dark:text-zinc-600">📎 画像を添付して分析もできます</p>
                                 </div>
                             ) : (
                                 chatMessages.map((msg, i) => (
@@ -583,8 +786,28 @@ export default function AdminPage() {
                                         <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${msg.role === 'user' ? 'bg-zinc-200 dark:bg-zinc-800' : 'bg-orange-100 text-orange-600 dark:bg-orange-500/20 dark:text-orange-400'}`}>
                                             {msg.role === 'user' ? <User className="w-4 h-4 text-zinc-600 dark:text-zinc-400" /> : <Bot className="w-4 h-4" />}
                                         </div>
-                                        <div className={`px-4 py-2.5 rounded-2xl max-w-[85%] text-sm ${msg.role === 'user' ? 'bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200 rounded-tr-sm' : 'bg-orange-50 text-orange-900 dark:bg-orange-500/10 dark:text-orange-100 rounded-tl-sm border border-orange-100 dark:border-orange-500/20'}`}>
-                                            {msg.content}
+                                        <div className="flex flex-col gap-2 max-w-[85%]">
+                                            {/* Image preview for user messages */}
+                                            {msg.imagePreview && (
+                                                <div className={`overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-700 ${msg.role === 'user' ? 'self-end' : 'self-start'}`}>
+                                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                    <img src={msg.imagePreview} alt="添付画像" className="max-w-[200px] max-h-[150px] object-cover" />
+                                                </div>
+                                            )}
+                                            <div className={`px-4 py-2.5 rounded-2xl text-sm ${msg.role === 'user' ? 'bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200 rounded-tr-sm' : 'bg-orange-50 text-orange-900 dark:bg-orange-500/10 dark:text-orange-100 rounded-tl-sm border border-orange-100 dark:border-orange-500/20'}`}>
+                                                <span style={{ whiteSpace: 'pre-wrap' }}>{msg.content}</span>
+                                            </div>
+                                            {/* Apply button for AI confirmation messages */}
+                                            {msg.role === 'ai' && msg.showApplyButton && (
+                                                <button
+                                                    onClick={() => handleApplyChanges(i)}
+                                                    disabled={isAssistantTyping}
+                                                    className="self-start flex items-center gap-1.5 rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-all hover:bg-emerald-600 hover:scale-105 disabled:opacity-50 disabled:hover:scale-100"
+                                                >
+                                                    <Check className="w-3.5 h-3.5" />
+                                                    適用する
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
                                 ))
@@ -607,28 +830,56 @@ export default function AdminPage() {
 
                         {/* Chat Input */}
                         <form onSubmit={handleAssistantSubmit} className="relative mt-auto border-t border-zinc-200 pt-4 dark:border-zinc-800">
-                            <textarea
-                                value={chatInput}
-                                onChange={(e) => setChatInput(e.target.value)}
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter' && !e.shiftKey) {
-                                        e.preventDefault();
-                                        handleAssistantSubmit();
-                                    }
-                                }}
-                                placeholder="修正内容を指示... (Shift+Enterで改行)"
-                                rows={3}
-                                className="w-full resize-none bg-zinc-100 rounded-xl pl-4 pr-12 py-3 text-sm outline-none transition-colors border-2 border-transparent focus:border-orange-500 dark:bg-zinc-900/50 dark:text-white dark:border-zinc-800 dark:focus:border-orange-500"
-                                disabled={isAssistantTyping}
-                            />
-                            <button
-                                type="button"
-                                onClick={(e) => { e.preventDefault(); handleAssistantSubmit(); }}
-                                disabled={!chatInput.trim() || isAssistantTyping}
-                                className="absolute right-3 bottom-6 p-2 bg-orange-500 text-white rounded-lg transition-transform hover:scale-105 disabled:opacity-50 disabled:hover:scale-100"
-                            >
-                                <Send className="w-4 h-4" />
-                            </button>
+                            {/* Pending Image Preview */}
+                            {pendingImage && (
+                                <div className="mb-2 flex items-center gap-2 rounded-lg bg-zinc-100 p-2 dark:bg-zinc-800">
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img src={pendingImage.preview} alt="添付画像" className="h-12 w-12 rounded-md object-cover" />
+                                    <span className="flex-1 text-xs text-zinc-500 dark:text-zinc-400 truncate">画像が添付されました</span>
+                                    <button
+                                        type="button"
+                                        onClick={() => setPendingImage(null)}
+                                        className="p-1 text-zinc-400 hover:text-red-500 transition-colors"
+                                    >
+                                        <X className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            )}
+                            <div className="relative">
+                                <textarea
+                                    value={chatInput}
+                                    onChange={(e) => setChatInput(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && !e.shiftKey) {
+                                            e.preventDefault();
+                                            handleAssistantSubmit();
+                                        }
+                                    }}
+                                    placeholder="修正内容を指示... (Shift+Enterで改行)"
+                                    rows={3}
+                                    className="w-full resize-none bg-zinc-100 rounded-xl pl-10 pr-12 py-3 text-sm outline-none transition-colors border-2 border-transparent focus:border-orange-500 dark:bg-zinc-900/50 dark:text-white dark:border-zinc-800 dark:focus:border-orange-500"
+                                    disabled={isAssistantTyping}
+                                />
+                                {/* Image Attach Button */}
+                                <label className="absolute left-3 bottom-6 p-1 text-zinc-400 hover:text-orange-500 cursor-pointer transition-colors">
+                                    <Paperclip className="w-4 h-4" />
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        className="hidden"
+                                        onChange={handleChatImageSelect}
+                                        disabled={isAssistantTyping}
+                                    />
+                                </label>
+                                <button
+                                    type="button"
+                                    onClick={(e) => { e.preventDefault(); handleAssistantSubmit(); }}
+                                    disabled={!chatInput.trim() || isAssistantTyping}
+                                    className="absolute right-3 bottom-6 p-2 bg-orange-500 text-white rounded-lg transition-transform hover:scale-105 disabled:opacity-50 disabled:hover:scale-100"
+                                >
+                                    <Send className="w-4 h-4" />
+                                </button>
+                            </div>
                         </form>
                     </div>
                 </div>
@@ -672,7 +923,7 @@ export default function AdminPage() {
 
                 <div className="flex items-center gap-3">
                     <button
-                        onClick={fetchArticles}
+                        onClick={() => fetchArticles()}
                         disabled={loading}
                         className="flex h-10 w-10 items-center justify-center rounded-full border border-zinc-200 text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-900"
                         aria-label="更新"
@@ -913,5 +1164,13 @@ export default function AdminPage() {
                 )}
             </div>
         </div>
+    );
+}
+
+export default function AdminPage() {
+    return (
+        <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading...</div>}>
+            <AdminDashboard />
+        </Suspense>
     );
 }

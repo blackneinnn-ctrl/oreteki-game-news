@@ -1,1 +1,1 @@
-{"message":"{\"error\":{\"code\":404,\"message\":\"This model models/gemini-2.0-flash is no longer available to new users. Please update your code to use a newer model for the latest features and improvements.\",\"status\":\"NOT_FOUND\"}}","status":404}
+{"message":"{\"error\":{\"code\":503,\"message\":\"This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.\",\"status\":\"UNAVAILABLE\"}}","status":503}

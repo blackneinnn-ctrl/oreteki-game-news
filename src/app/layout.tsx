@@ -4,6 +4,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { InterstitialAd } from "@/components/interstitial-ad";
+import { BackToTop } from "@/components/back-to-top";
 
 export const metadata: Metadata = {
   title: {
@@ -66,6 +67,7 @@ export default function RootLayout({
           <Header />
           <main className="min-h-screen">{children}</main>
           <Footer />
+          <BackToTop />
         </ThemeProvider>
       </body>
     </html>

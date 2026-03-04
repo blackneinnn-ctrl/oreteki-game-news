@@ -31,6 +31,21 @@ export async function getArticleBySlug(slug: string): Promise<Article | null> {
   return data;
 }
 
+// IDから記事を取得（プレビュー用などステータス問わず）
+export async function getArticleById(id: string): Promise<Article | null> {
+  const { data, error } = await supabase
+    .from('articles')
+    .select('*')
+    .eq('id', id)
+    .single();
+
+  if (error) {
+    console.error('Error fetching article by id:', error);
+    return null;
+  }
+  return data;
+}
+
 // 人気記事を取得（閲覧数順）
 export async function getPopularArticles(limit: number = 5): Promise<Article[]> {
   const { data, error } = await supabase
@@ -154,9 +169,9 @@ export async function createArticle(article: {
   tags?: string[];
   image_url?: string;
   status?: 'draft' | 'published';
-}): Promise<boolean> {
+}): Promise<{ success: boolean; id?: string }> {
   const slug = `article-${Date.now()}`;
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('articles')
     .insert({
       title: article.title,
@@ -168,13 +183,53 @@ export async function createArticle(article: {
       author: '管理人',
       status: article.status || 'draft',
       views: 0,
-    });
+    })
+    .select('id')
+    .single();
 
   if (error) {
     console.error('Error creating article:', error);
-    return false;
+    return { success: false };
   }
-  return true;
+  return { success: true, id: data?.id };
+}
+
+// 関連記事を取得（同じタグを持つ記事、なければ最新記事）
+export async function getRelatedArticles(
+  currentId: string,
+  tags: string[],
+  limit: number = 4
+): Promise<Article[]> {
+  // First try to find articles with overlapping tags
+  if (tags.length > 0) {
+    const { data, error } = await supabase
+      .from('articles')
+      .select('*')
+      .eq('status', 'published')
+      .neq('id', currentId)
+      .overlaps('tags', tags)
+      .order('published_at', { ascending: false })
+      .limit(limit);
+
+    if (!error && data && data.length > 0) {
+      return data;
+    }
+  }
+
+  // Fallback: latest articles excluding current
+  const { data, error } = await supabase
+    .from('articles')
+    .select('*')
+    .eq('status', 'published')
+    .neq('id', currentId)
+    .order('published_at', { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    console.error('Error fetching related articles:', error);
+    return [];
+  }
+  return data ?? [];
 }
 
 // 閲覧数を増やす

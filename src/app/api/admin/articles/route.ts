@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAllArticles, updateArticleStatus, deleteArticle, deleteArticles, updateArticle, createArticle } from '@/data/articles';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
 
     const articles = await getAllArticles();
@@ -54,7 +56,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Title and content are required' }, { status: 400 });
     }
 
-    const success = await createArticle({
+    const result = await createArticle({
         title,
         excerpt: excerpt || '',
         content: content,
@@ -63,11 +65,11 @@ export async function POST(request: NextRequest) {
         status: status || 'draft',
     });
 
-    if (!success) {
+    if (!result.success) {
         return NextResponse.json({ error: 'Failed to create' }, { status: 500 });
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, id: result.id });
 }
 
 export async function DELETE(request: NextRequest) {

@@ -1,10 +1,18 @@
 import Link from "next/link";
 import Image from "next/image";
-import { Clock } from "lucide-react";
+import { Clock, Eye } from "lucide-react";
 import type { Article } from "@/lib/supabase";
 
 export function ArticleCard({ article }: { article: Article }) {
     const date = new Date(article.published_at ?? article.created_at).toLocaleDateString('ja-JP');
+
+    // Check if article is new (published within last 3 days)
+    const isNew = (() => {
+        const publishedDate = new Date(article.published_at ?? article.created_at);
+        const threeDaysAgo = new Date();
+        threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+        return publishedDate > threeDaysAgo;
+    })();
 
     return (
         <Link
@@ -21,6 +29,23 @@ export function ArticleCard({ article }: { article: Article }) {
                     sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
+
+                {/* Overlay badges */}
+                <div className="absolute top-2 left-2 flex flex-wrap gap-1.5">
+                    {isNew && (
+                        <span className="rounded-md bg-red-500 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white shadow-sm">
+                            New
+                        </span>
+                    )}
+                    {article.tags.slice(0, 2).map((tag) => (
+                        <span
+                            key={tag}
+                            className="rounded-md bg-black/50 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm"
+                        >
+                            {tag}
+                        </span>
+                    ))}
+                </div>
             </div>
 
             {/* Content */}
@@ -38,6 +63,10 @@ export function ArticleCard({ article }: { article: Article }) {
                     <div className="flex items-center gap-1 text-zinc-400">
                         <Clock className="h-3 w-3" />
                         <time className="text-xs">{date}</time>
+                    </div>
+                    <div className="flex items-center gap-1 text-zinc-400 ml-auto">
+                        <Eye className="h-3 w-3" />
+                        <span className="text-xs">{article.views.toLocaleString()}</span>
                     </div>
                 </div>
             </div>
