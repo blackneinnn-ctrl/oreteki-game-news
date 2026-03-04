@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { Clock, Eye } from "lucide-react";
+import { Clock } from "lucide-react";
 import type { Article } from "@/lib/supabase";
 
 export function ArticleCard({ article }: { article: Article }) {
@@ -63,10 +63,6 @@ export function ArticleCard({ article }: { article: Article }) {
                     <div className="flex items-center gap-1 text-zinc-400">
                         <Clock className="h-3 w-3" />
                         <time className="text-xs">{date}</time>
-                    </div>
-                    <div className="flex items-center gap-1 text-zinc-400 ml-auto">
-                        <Eye className="h-3 w-3" />
-                        <span className="text-xs">{article.views.toLocaleString()}</span>
                     </div>
                 </div>
             </div>

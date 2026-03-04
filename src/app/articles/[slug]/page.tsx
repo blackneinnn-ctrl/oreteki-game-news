@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Clock, User, ArrowLeft, Tag, ExternalLink, Eye, BookOpen } from "lucide-react";
+import { Clock, User, ArrowLeft, Tag, ExternalLink, BookOpen } from "lucide-react";
 import { getArticleBySlug, getPublishedArticles } from "@/data/articles";
 import { Sidebar } from "@/components/sidebar";
 import { ShareButton } from "@/components/share-button";
@@ -196,10 +196,6 @@ export default async function ArticlePage({
                             <div className="flex items-center gap-1.5 text-sm text-zinc-500 dark:text-zinc-400">
                                 <BookOpen className="h-4 w-4" />
                                 <span>約{readingTime}分で読めます</span>
-                            </div>
-                            <div className="flex items-center gap-1.5 text-sm text-zinc-500 dark:text-zinc-400">
-                                <Eye className="h-4 w-4" />
-                                <span>{article.views.toLocaleString()} views</span>
                             </div>
                             <ShareButton
                                 url={`${siteUrl}/articles/${slug}`}

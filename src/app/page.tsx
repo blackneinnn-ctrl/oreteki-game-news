@@ -265,10 +265,6 @@ export default async function Home() {
                               <Clock className="h-4 w-4" />
                               <time className="text-sm">{new Date(article.published_at ?? article.created_at).toLocaleDateString('ja-JP')}</time>
                             </div>
-                            <div className="flex items-center gap-1.5 text-zinc-400">
-                              <Flame className="h-4 w-4" />
-                              <span className="text-sm">{article.views.toLocaleString()} views</span>
-                            </div>
                           </div>
                         </div>
                       </Link>

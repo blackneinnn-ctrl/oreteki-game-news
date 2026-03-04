@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { TrendingUp, Eye } from "lucide-react";
+import { TrendingUp } from "lucide-react";
 import { getPopularArticles } from "@/data/articles";
 
 export async function TrendingScroll() {
@@ -34,10 +34,6 @@ export async function TrendingScroll() {
                                     sizes="280px"
                                 />
                                 <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
-                                <div className="absolute bottom-2 right-2 flex items-center gap-1 rounded-md bg-black/60 px-2 py-0.5 text-[10px] font-medium text-zinc-300 backdrop-blur-sm">
-                                    <Eye className="h-3 w-3" />
-                                    {article.views.toLocaleString()}
-                                </div>
                             </div>
                             <div className="flex flex-1 flex-col p-3">
                                 <h3 className="line-clamp-2 text-sm font-bold leading-snug text-zinc-200 transition-colors group-hover:text-orange-400">
@@ -58,6 +54,6 @@ export async function TrendingScroll() {
                     ))}
                 </div>
             </div>
-        </section>
+        </section >
     );
 }
