@@ -48,7 +48,7 @@ function AdminDashboard() {
     const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'ai'; content: string; imagePreview?: string; showApplyButton?: boolean }[]>([]);
     const [chatInput, setChatInput] = useState("");
     const [isAssistantTyping, setIsAssistantTyping] = useState(false);
-    const [selectedModel, setSelectedModel] = useState("gemini-3-pro-preview");
+    const [selectedModel, setSelectedModel] = useState("gemini-3.1-pro-preview");
     const [costData, setCostData] = useState<{ totalUsd: number; totalJpy: number } | null>(null);
     const [pendingImage, setPendingImage] = useState<{ data: string; mimeType: string; preview: string } | null>(null);
 
@@ -767,7 +767,7 @@ function AdminDashboard() {
                             >
                                 <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
                                 <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
-                                <option value="gemini-3-pro-preview">Gemini 3 Pro (Preview)</option>
+                                <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro (Preview)</option>
                             </select>
                         </div>
 
