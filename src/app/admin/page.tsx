@@ -738,7 +738,7 @@ function AdminDashboard() {
                                                         document.execCommand('insertLineBreak');
                                                     }
                                                 }}
-                                                className="article-content text-zinc-700 dark:text-zinc-300 outline-none focus:ring-2 focus:ring-orange-500/10 rounded-lg p-2 transition-all min-h-[40vh]"
+                                                className="article-content text-white outline-none focus:ring-2 focus:ring-orange-500/10 rounded-lg p-2 transition-all min-h-[40vh]"
                                                 dangerouslySetInnerHTML={{ __html: editForm.pages[currentEditorPageIndex] }}
                                             />
                                         ) : (

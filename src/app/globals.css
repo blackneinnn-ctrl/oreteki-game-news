@@ -30,6 +30,7 @@ body {
   font-size: 1rem;
   word-break: break-word;
   overflow-wrap: break-word;
+  color: #ffffff;
 }
 
 .article-content h2 {
@@ -54,7 +55,7 @@ body {
   font-weight: 600;
   margin-top: 1.5rem;
   margin-bottom: 0.5rem;
-  color: #a1a1aa;
+  color: #ffffff;
 }
 
 .article-content p {
@@ -63,12 +64,12 @@ body {
 
 .article-content strong {
   font-weight: 700;
-  color: #fafafa;
+  color: #ffffff;
 }
 
 .article-content em {
   font-style: italic;
-  color: #d4d4d8;
+  color: #ffffff;
 }
 
 /* Lists */
@@ -103,7 +104,7 @@ body {
   margin: 2rem 0;
   border-radius: 0 0.75rem 0.75rem 0;
   font-style: italic;
-  color: #a1a1aa;
+  color: #e4e4e7;
 }
 
 .article-content blockquote p:last-child {
@@ -132,7 +133,7 @@ body {
 
 .article-content pre code {
   background: none;
-  color: #d4d4d8;
+  color: #ffffff;
   padding: 0;
   font-size: 0.85rem;
   line-height: 1.7;

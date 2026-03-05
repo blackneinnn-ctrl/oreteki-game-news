@@ -205,7 +205,7 @@ export default async function ArticlePage({
 
                         {/* Article Body */}
                         <div
-                            className="article-content text-zinc-700 dark:text-zinc-300"
+                            className="article-content text-white"
                             dangerouslySetInnerHTML={{ __html: pageContent }}
                         />
 

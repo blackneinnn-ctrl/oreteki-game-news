@@ -142,7 +142,7 @@ export function PreviewEditor({ articleId, initialContent }: PreviewEditorProps)
                             document.execCommand('insertLineBreak');
                         }
                     }}
-                    className="article-content text-zinc-700 dark:text-zinc-300 outline-none focus:ring-2 focus:ring-orange-500/20 focus:bg-white dark:focus:bg-zinc-950 rounded-xl p-2 sm:p-4 transition-all"
+                    className="article-content text-white outline-none focus:ring-2 focus:ring-orange-500/20 focus:bg-white dark:focus:bg-zinc-950 rounded-xl p-2 sm:p-4 transition-all"
                     dangerouslySetInnerHTML={{ __html: pages[currentPageIndex] || "" }}
                 />
             </div>
