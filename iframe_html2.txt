@@ -1,0 +1,11 @@
+h1 class="article-title">【ネタバレなしレビュー】『UNDERTALE』――“誰も倒さなくていい”RPGが世界中で愛される理由</h1>
+        <div class="article-meta">Game Review | 読了目安: 約4分</div>
+    </header>
+
+    <div class="video-wrapper">
+        <iframe src="https://www.youtube.com/embed/ep678gvMAnw" title="【公式】UNDERTALE 日本語版 発売アナウンストレーラー (PS4/Vita/PC)" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen=""></iframe>
+    </div>
+
+    <p>次に遊ぶゲームを探しているあなたへ。</p>
+    <p>そして、『UNDERTALE』という名前に惹かれつつも、まだその全貌を知らないあなたへ。今、あなたが体験しようとしているのは、これまでのRPGの常識を心地よく裏切る、<strong>深く心に残る冒険</strong>です。</p>
+    <p>「誰も死ななくていいやさしいRPG」というキャッチコピーの通り、

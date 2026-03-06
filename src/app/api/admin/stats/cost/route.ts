@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 const PRICING: Record<string, { input: number; output: number }> = {
     'gemini-2.5-flash': { input: 0.30, output: 2.50 },
     'gemini-2.5-pro': { input: 1.25, output: 10.00 },
-    'gemini-3-pro-preview': { input: 2.00, output: 12.00 },
+    'gemini-3.1-pro-preview': { input: 2.00, output: 12.00 },
     'gemini-1.5-flash': { input: 0.15, output: 0.60 }, // 念のためのフォールバック
     'gemini-1.5-pro': { input: 1.25, output: 5.00 },
 };
@@ -28,7 +28,7 @@ export async function GET() {
         const modelBreakdown: Record<string, { input: number; output: number; cost: number }> = {};
 
         usageLogs?.forEach(log => {
-            const pricing = PRICING[log.model] || PRICING['gemini-3-pro-preview'] || PRICING['gemini-2.5-flash'];
+            const pricing = PRICING[log.model] || PRICING['gemini-3.1-pro-preview'] || PRICING['gemini-2.5-flash'];
             const inputCost = (log.input_tokens / 1_000_000) * pricing.input;
             const outputCost = (log.output_tokens / 1_000_000) * pricing.output;
             const cost = inputCost + outputCost;

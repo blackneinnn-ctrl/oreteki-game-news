@@ -1,0 +1,19 @@
+ュー】『UNDERTALE』――“誰も倒さなくていい”RPGが世界中で愛される理由</title>
+<style>
+    :root {
+        --bg-color: #121212;
+        --text-color: #e0e0e0;
+        --accent-red: #ff3333;
+        --accent-yellow: #f1c40f;
+        --link-color: #3498db;
+        --box-bg: #1e1e1e;
+        --border-color: #333;
+    }
+
+    body {
+        font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+        background-color: var(--bg-color);
+        color: var(--text-color);
+        line-height: 1.8;
+        margin: 0;
+        padding
