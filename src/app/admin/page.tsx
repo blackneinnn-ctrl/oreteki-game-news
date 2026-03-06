@@ -765,6 +765,7 @@ function AdminDashboard() {
                                 disabled={isAssistantTyping}
                                 className="text-xs font-medium bg-zinc-100 border-none rounded-lg px-2 py-1.5 text-zinc-600 outline-none cursor-pointer dark:bg-zinc-800 dark:text-zinc-400 focus:ring-2 focus:ring-orange-500/20"
                             >
+                                <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro (Preview)</option>
                                 <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
                                 <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
                                 <option value="gemini-3-pro-preview">Gemini 3 Pro (Preview)</option>

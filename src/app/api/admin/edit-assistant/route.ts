@@ -117,8 +117,7 @@ ${prompt}
             model: model || 'gemini-3.1-pro-preview',
             contents: contents,
             config: {
-                systemInstruction: systemInstruction,
-                responseMimeType: 'application/json'
+                systemInstruction: systemInstruction
             }
         });
 
