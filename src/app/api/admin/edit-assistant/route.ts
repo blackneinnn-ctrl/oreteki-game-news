@@ -118,6 +118,7 @@ ${prompt}
             contents: contents,
             config: {
                 systemInstruction: systemInstruction,
+                responseMimeType: 'application/json'
             }
         });
 

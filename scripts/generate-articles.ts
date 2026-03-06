@@ -417,8 +417,8 @@ async function generateArticle(
 システムはあなたが \`references\` に含めたURLから、自動的に画像をスクレイピングして記事内に挿入します。
 そのため、**2次利用画像（他者のブログ、まとめサイト、一般のニュースサイトの切り抜き画像など、「孫引き」となる画像）が記事に挿入されることを防ぐため、以下のルールを絶対に厳守してください。**
 
-1. \`references\` の配列の**一番最初（先頭）**には、必ず「高品質な公式画像が設定されている」と考えられる**公式HPの該当ニュースページ、公式プレスリリース（PR TIMES等）、プラットフォームストア（Steam/PS Store等）、または公式X（Twitter）の該当ポストのURL**を配置してください。
-2. これらがどうしても見つからない場合に限り、ファミ通など信頼できる大手ゲームメディアのURLを配置してください。
+1. **【絶対厳守】** \`references\` の配列の**一番最初（先頭のインデックス0）**には、必ず「高品質な公式画像が設定されている」と考えられる**公式HPの該当ニュースページ、公式プレスリリース（PR TIMES等）、ゲームプラットフォームの公式ストア（Steam/PS Store/My Nintendo Store等）、または公式X（Twitter）の該当ポストのURL**を配置してください。この指示は最優先されなければいけません。
+2. これらがどうしても見つからない場合（インディーズゲーム等）に限り、ファミ通など信頼できる大手ゲームメディアのURLを配置してください。
 3. **いかなる場合でも、まとめサイト、個人ブログ、Wikipedia、非公式WikiなどのURLは \`references\` に絶対含めないでください。これらは「孫引き」の原因となります。**
 4. \`references\` 配列には、最終的に記事の執筆に参考にした全てのURL（上記ルールを満たすもの）を含めてください。
 
@@ -572,6 +572,7 @@ ${commonRules}`;
                 contents: prompt,
                 config: {
                     tools: [{ googleSearch: {} }],
+                    responseMimeType: 'application/json'
                 }
             });
 
@@ -655,7 +656,9 @@ ${commonRules}`;
 
             // Node側でYouTubeとSteamのIDを確実に検索
             onProgress?.('関連動画とストア情報を検索中...', 4);
-            const searchQuery = `${parsed.title} 公式 トレイラー`;
+            // 検索精度を上げるため、AIが付けた長いタイトルではなくシンプルなキーワードを抽出する
+            const simpleGameTitle = parsed.title.split('：')[0].split(' - ')[0].replace(/【.*?】/g, '').trim();
+            const searchQuery = `${simpleGameTitle} 公式 トレイラー`;
             const videoId = await searchYouTubeAPI(searchQuery);
             const steamId = await searchSteamAppID(parsed.title);
 
