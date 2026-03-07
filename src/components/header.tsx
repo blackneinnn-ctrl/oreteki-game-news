@@ -29,11 +29,11 @@ export function Header() {
                     {/* Logo */}
                     <Link href="/" className="relative z-10 flex h-20 w-[400px] items-center overflow-hidden group">
                         <Image
-                            src="/logo.png"
+                            src="/俺的5.png"
                             alt="俺的ゲームニュース"
                             width={1200}
                             height={240}
-                            className="h-[500px] w-auto object-contain transition-transform group-hover:scale-105"
+                            className="h-auto w-[300px] object-contain transition-transform group-hover:scale-105"
                             priority
                         />
                     </Link>

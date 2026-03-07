@@ -1,0 +1,5 @@
+{
+  "rawText": "<h2 style=\"color: red; font-size: larger;\">ゲームの魅力</h2>\n<p>とても面白いです。</p>",
+  "matchedCodeBlock": false,
+  "betterCleaned": "<h2 style=\"color: red; font-size: larger;\">ゲームの魅力</h2>\n<p>とても面白いです。</p>"
+}
