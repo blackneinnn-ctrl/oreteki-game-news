@@ -58,9 +58,9 @@ export default async function Home() {
                     <p className="mt-2 line-clamp-2 max-w-2xl text-sm text-zinc-300 sm:text-base">
                       {featured[0].excerpt}
                     </p>
-                    <div className="mt-3 flex items-center gap-3 text-xs text-zinc-400">
-                      <span>{featured[0].author}</span>
-                      <span>·</span>
+                    <div className="mt-3 flex items-center text-xs text-zinc-400">
+
+                      
                       <div className="flex items-center gap-1">
                         <Clock className="h-3 w-3" />
                         <time>{new Date(featured[0].published_at ?? featured[0].created_at).toLocaleDateString('ja-JP')}</time>
@@ -98,9 +98,9 @@ export default async function Home() {
                         <p className="mt-1.5 line-clamp-2 text-sm text-zinc-300">
                           {article.excerpt}
                         </p>
-                        <div className="mt-2 flex items-center gap-3 text-xs text-zinc-400">
-                          <span>{article.author}</span>
-                          <span>·</span>
+                        <div className="mt-2 flex items-center text-xs text-zinc-400">
+
+                          
                           <div className="flex items-center gap-1">
                             <Clock className="h-3 w-3" />
                             <time>{new Date(article.published_at ?? article.created_at).toLocaleDateString('ja-JP')}</time>
@@ -139,9 +139,9 @@ export default async function Home() {
                       <p className="mt-2 line-clamp-2 text-sm text-zinc-300 sm:text-base">
                         {featured[0].excerpt}
                       </p>
-                      <div className="mt-3 flex items-center gap-3 text-xs text-zinc-400">
-                        <span>{featured[0].author}</span>
-                        <span>·</span>
+                      <div className="mt-3 flex items-center text-xs text-zinc-400">
+
+                        
                         <div className="flex items-center gap-1">
                           <Clock className="h-3 w-3" />
                           <time>{new Date(featured[0].published_at ?? featured[0].created_at).toLocaleDateString('ja-JP')}</time>
@@ -257,10 +257,7 @@ export default async function Home() {
                           <p className="mt-3 hidden line-clamp-2 text-sm leading-relaxed text-zinc-300 sm:block sm:text-base">
                             {article.excerpt}
                           </p>
-                          <div className="mt-4 flex items-center gap-3">
-                            <span className="text-sm font-medium text-zinc-300">
-                              {article.author}
-                            </span>
+                          <div className="mt-4 flex items-center gap-1.5">
                             <div className="flex items-center gap-1.5 text-zinc-400">
                               <Clock className="h-4 w-4" />
                               <time className="text-sm">{new Date(article.published_at ?? article.created_at).toLocaleDateString('ja-JP')}</time>

@@ -56,10 +56,7 @@ export function ArticleCard({ article }: { article: Article }) {
                 <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
                     {article.excerpt}
                 </p>
-                <div className="mt-auto flex items-center gap-3 pt-3">
-                    <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
-                        {article.author}
-                    </span>
+                <div className="mt-auto flex items-center pt-3">
                     <div className="flex items-center gap-1 text-zinc-400">
                         <Clock className="h-3 w-3" />
                         <time className="text-xs">{date}</time>
