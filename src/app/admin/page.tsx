@@ -1,14 +1,83 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
+import Image from "next/image";
 import {
     Shield, Eye, Trash2, Check, X, Clock, ExternalLink,
-    LogIn, RefreshCw, Pencil, Save, ArrowLeft, Plus, Send, Bot, User, CreditCard,
-    Paperclip, ImageIcon
+    RefreshCw, Pencil, ArrowLeft, Plus, Send, Bot, User, CreditCard,
+    Paperclip
 } from "lucide-react";
 import type { Article } from "@/lib/supabase";
+import {
+    ARTICLE_GENERATION_OPTIONS,
+    getCategoryFromGenerationAttribute,
+    getGenerationOption,
+    type ArticleCategory,
+    type ArticleGenerationAttribute,
+} from "@/lib/article-taxonomy";
 import { EditorToolbar } from "@/components/editor-toolbar";
+
+type InlineImageData = { data: string; mimeType: string };
+type AssistantAction = "edit" | "research" | "research-edit";
+type ChatSource = {
+    title: string;
+    uri: string;
+    domain: string;
+};
+type ChatMessage = {
+    role: 'user' | 'ai';
+    content: string;
+    imagePreview?: string;
+    showApplyButton?: boolean;
+    imageData?: InlineImageData;
+    assistantAction?: AssistantAction;
+    sources?: ChatSource[];
+};
+
+function isAssistantAction(value: unknown): value is AssistantAction {
+    return value === "edit" || value === "research" || value === "research-edit";
+}
+
+function normalizeChatSources(value: unknown): ChatSource[] {
+    if (!Array.isArray(value)) return [];
+
+    return value.flatMap((item) => {
+        if (!item || typeof item !== "object") return [];
+
+        const candidate = item as {
+            title?: unknown;
+            uri?: unknown;
+            domain?: unknown;
+        };
+
+        if (typeof candidate.title !== "string" || typeof candidate.uri !== "string") {
+            return [];
+        }
+
+        const title = candidate.title.trim();
+        const uri = candidate.uri.trim();
+        const domain = typeof candidate.domain === "string" ? candidate.domain.trim() : "";
+
+        if (!title || !uri) return [];
+
+        return [{ title, uri, domain }];
+    });
+}
+
+function sanitizeProgressMessage(message: string): string {
+    const trimmed = message.trim();
+    if (!trimmed) return "";
+
+    const mojibakePatterns = [
+        /[�]/,
+        /[-ÿ]{8,}/,
+        /[鬯鬩繝郢驛蟷髫雜陝隴譎蜿螟]/,
+        /(?:・ｽ|繝|鬯|郢|驛|蟷|髫|雜){2,}/,
+    ];
+
+    return mojibakePatterns.some((pattern) => pattern.test(trimmed)) ? "" : trimmed;
+}
 
 function AdminDashboard() {
     const searchParams = useSearchParams();
@@ -22,8 +91,10 @@ function AdminDashboard() {
     const [generateMessage, setGenerateMessage] = useState("");
     const [progress, setProgress] = useState(0);
     const [progressStatus, setProgressStatus] = useState<"idle" | "running" | "completed" | "error">("idle");
-    const [selectedAttribute, setSelectedAttribute] = useState<"game_news" | "game_intro">("game_news");
+    const [selectedAttribute, setSelectedAttribute] = useState<ArticleGenerationAttribute>("game_news");
     const [generateKeyword, setGenerateKeyword] = useState("");
+    const selectedGenerationOption = getGenerationOption(selectedAttribute);
+    const visibleGenerateMessage = sanitizeProgressMessage(generateMessage);
 
     // UI State
     const [viewMode, setViewMode] = useState<"list" | "editor">("list");
@@ -39,13 +110,14 @@ function AdminDashboard() {
         pages: [""] as string[],
         tags: "",
         image_url: "",
+        category: "game" as ArticleCategory,
     });
     const [currentEditorPageIndex, setCurrentEditorPageIndex] = useState(0);
     const [saving, setSaving] = useState(false);
     const [sortBy, setSortBy] = useState<"date" | "views">("date");
 
     // AI Edit Assistant State
-    const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'ai'; content: string; imagePreview?: string; showApplyButton?: boolean }[]>([]);
+    const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
     const [chatInput, setChatInput] = useState("");
     const [isAssistantTyping, setIsAssistantTyping] = useState(false);
     const [selectedModel, setSelectedModel] = useState("gemini-3.1-pro-preview");
@@ -72,6 +144,7 @@ function AdminDashboard() {
             pages: article.content ? article.content.split('<!-- PAGE_BREAK -->') : [""],
             tags: article.tags.join(", "),
             image_url: article.image_url,
+            category: article.category,
         });
         setEditorTab("edit");
         setCurrentEditorPageIndex(0);
@@ -102,6 +175,7 @@ function AdminDashboard() {
                         pages: articleToEdit.content ? articleToEdit.content.split('<!-- PAGE_BREAK -->') : [""],
                         tags: articleToEdit.tags.join(", "),
                         image_url: articleToEdit.image_url,
+                        category: articleToEdit.category,
                     });
                     setEditorTab("edit");
                     setCurrentEditorPageIndex(0);
@@ -157,7 +231,7 @@ function AdminDashboard() {
         return () => {
             if (interval) clearInterval(interval);
         };
-    }, [isGenerating, fetchArticles]);
+    }, [isGenerating, fetchArticles, fetchCost]);
 
     const handleStatusChange = async (id: string, status: "draft" | "published") => {
         try {
@@ -175,7 +249,7 @@ function AdminDashboard() {
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm("この記事を削除しますか？この操作は取り消せません。")) return;
+        if (!confirm("この記事を削除しますか？この操作は元に戻せません。")) return;
         try {
             const res = await fetch("/api/admin/articles", {
                 method: "DELETE",
@@ -192,7 +266,7 @@ function AdminDashboard() {
 
     const handleBulkDelete = async () => {
         if (selectedIds.length === 0) return;
-        if (!confirm(`${selectedIds.length}件の記事を削除しますか？この操作は取り消せません。`)) return;
+        if (!confirm(`${selectedIds.length}件の記事を削除しますか？この操作は元に戻せません。`)) return;
         try {
             const res = await fetch("/api/admin/articles", {
                 method: "DELETE",
@@ -213,7 +287,7 @@ function AdminDashboard() {
     };
 
     const handleGenerate = async () => {
-        if (!confirm("AIによる自動生成プロセスを開始しますか？\n（完了まで数分かかる場合があります）")) return;
+        if (!confirm("AIで記事を生成しますか？完了まで数分かかる場合があります。")) return;
 
         setProgress(0);
         setProgressStatus("running");
@@ -245,9 +319,10 @@ function AdminDashboard() {
 
     // --- AI Edit Assistant ---
     // Build conversation history for the API from current chat messages
-    const buildConversationHistory = () => {
-        return chatMessages
-            .filter(msg => !msg.showApplyButton || msg.role === 'ai') // include all messages
+    const buildConversationHistory = (messages: ChatMessage[]) => {
+        return messages
+            .filter(msg => msg.content.trim().length > 0)
+            .slice(-20)
             .map(msg => ({
                 role: msg.role === 'user' ? 'user' as const : 'model' as const,
                 text: msg.content
@@ -260,9 +335,15 @@ function AdminDashboard() {
 
         const userInstruction = chatInput.trim();
         const imageToSend = pendingImage;
+        const historyForRequest = buildConversationHistory(chatMessages);
         setChatInput("");
         setPendingImage(null);
-        setChatMessages(prev => [...prev, { role: 'user', content: userInstruction, imagePreview: imageToSend?.preview }]);
+        setChatMessages(prev => [...prev, {
+            role: 'user',
+            content: userInstruction,
+            imagePreview: imageToSend?.preview,
+            imageData: imageToSend ? { data: imageToSend.data, mimeType: imageToSend.mimeType } : undefined
+        }]);
         setIsAssistantTyping(true);
 
         try {
@@ -271,24 +352,38 @@ function AdminDashboard() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     currentHtml: editForm.pages[currentEditorPageIndex] || "",
+                    currentPages: editForm.pages,
+                    currentPageIndex: currentEditorPageIndex,
                     prompt: userInstruction,
                     model: selectedModel,
                     mode: 'chat',
                     image: imageToSend ? { data: imageToSend.data, mimeType: imageToSend.mimeType } : undefined,
-                    conversationHistory: buildConversationHistory()
+                    conversationHistory: historyForRequest
                 }),
             });
 
             const data = await res.json();
 
             if (!res.ok) {
-                setChatMessages(prev => [...prev, { role: 'ai', content: `❌ エラー: ${data.error || '処理に失敗しました'}` }]);
+                setChatMessages(prev => [...prev, { role: 'ai', content: `⚠️ エラー: ${data.error || '処理に失敗しました'}` }]);
             } else {
-                setChatMessages(prev => [...prev, { role: 'ai', content: data.message, showApplyButton: true }]);
+                const assistantAction = isAssistantAction(data.assistantAction) ? data.assistantAction : 'edit';
+                const sources = normalizeChatSources(data.sources);
+                setChatMessages(prev => [...prev, {
+                    role: 'ai',
+                    content: typeof data.message === 'string' && data.message.trim()
+                        ? data.message
+                        : '提案を生成できませんでした。',
+                    showApplyButton: typeof data.allowApply === 'boolean'
+                        ? data.allowApply
+                        : assistantAction !== 'research',
+                    assistantAction,
+                    sources,
+                }]);
                 fetchCost();
             }
-        } catch (error) {
-            setChatMessages(prev => [...prev, { role: 'ai', content: '❌ ネットワークエラーが発生しました。' }]);
+        } catch {
+            setChatMessages(prev => [...prev, { role: 'ai', content: '通信エラーが発生しました。' }]);
         } finally {
             setIsAssistantTyping(false);
         }
@@ -302,20 +397,28 @@ function AdminDashboard() {
         setChatMessages(prev => prev.map((msg, i) => i === messageIndex ? { ...msg, showApplyButton: false } : msg));
 
         try {
-            // Build history up to and including the message that was approved
-            const historyUpToApproval = chatMessages.slice(0, messageIndex + 1).map(msg => ({
-                role: msg.role === 'user' ? 'user' as const : 'model' as const,
-                text: msg.content
-            }));
+            const messagesUpToApproval = chatMessages.slice(0, messageIndex + 1);
+            const historyUpToApproval = buildConversationHistory(messagesUpToApproval);
+            const approvedMessage = chatMessages[messageIndex];
+            const approvedPlan = approvedMessage?.role === 'ai'
+                ? approvedMessage.content
+                : '適用してください';
+            const latestImageForApply = [...messagesUpToApproval]
+                .reverse()
+                .find(msg => msg.role === 'user' && msg.imageData)?.imageData;
+            const previousPageCount = editForm.pages.length;
 
             const res = await fetch("/api/admin/edit-assistant", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     currentHtml: editForm.pages[currentEditorPageIndex] || "",
-                    prompt: '適用してください',
+                    currentPages: editForm.pages,
+                    currentPageIndex: currentEditorPageIndex,
+                    prompt: approvedPlan,
                     model: selectedModel,
                     mode: 'apply',
+                    image: latestImageForApply ? { data: latestImageForApply.data, mimeType: latestImageForApply.mimeType } : undefined,
                     conversationHistory: historyUpToApproval
                 }),
             });
@@ -323,19 +426,43 @@ function AdminDashboard() {
             const data = await res.json();
 
             if (!res.ok) {
-                setChatMessages(prev => [...prev, { role: 'ai', content: `❌ エラー: ${data.error || '適用に失敗しました'}` }]);
+                setChatMessages(prev => [...prev, { role: 'ai', content: `⚠️ エラー: ${data.error || '適用に失敗しました'}` }]);
             } else {
-                setEditForm(prev => {
-                    const newPages = [...prev.pages];
-                    newPages[currentEditorPageIndex] = data.html;
-                    return { ...prev, pages: newPages };
-                });
-                setChatMessages(prev => [...prev, { role: 'ai', content: data.message || '✅ 修正が完了しました！プレビューに反映されています。' }]);
+                const returnedPages = Array.isArray(data.pages)
+                    ? data.pages.filter((page: unknown): page is string => typeof page === "string")
+                    : [];
+
+                if (returnedPages.length > 0) {
+                    setEditForm(prev => ({ ...prev, pages: returnedPages }));
+                    const requestedIndex = Number.isInteger(data.currentPageIndex)
+                        ? Number(data.currentPageIndex)
+                        : currentEditorPageIndex;
+                    const safeIndex = Math.min(Math.max(requestedIndex, 0), returnedPages.length - 1);
+                    setCurrentEditorPageIndex(safeIndex);
+                } else {
+                    setEditForm(prev => {
+                        const newPages = [...prev.pages];
+                        newPages[currentEditorPageIndex] = data.html;
+                        return { ...prev, pages: newPages };
+                    });
+                }
+
+                let applyMessage = data.message || '変更を適用しました。プレビューに反映しています。';
+                if (returnedPages.length > 0) {
+                    const diff = returnedPages.length - previousPageCount;
+                    if (diff > 0) {
+                        applyMessage += `（${diff}ページ追加）`;
+                    } else if (diff < 0) {
+                        applyMessage += `（${Math.abs(diff)}ページ削除）`;
+                    }
+                }
+
+                setChatMessages(prev => [...prev, { role: 'ai', content: applyMessage }]);
                 setEditorTab("preview");
                 fetchCost();
             }
-        } catch (error) {
-            setChatMessages(prev => [...prev, { role: 'ai', content: '❌ ネットワークエラーが発生しました。' }]);
+        } catch {
+            setChatMessages(prev => [...prev, { role: 'ai', content: '通信エラーが発生しました。' }]);
         } finally {
             setIsAssistantTyping(false);
         }
@@ -348,7 +475,7 @@ function AdminDashboard() {
 
         // Check file size (max 10MB for Gemini inline data)
         if (file.size > 10 * 1024 * 1024) {
-            setChatMessages(prev => [...prev, { role: 'ai', content: '❌ 画像サイズが10MBを超えています。もっと小さい画像を選択してください。' }]);
+            setChatMessages(prev => [...prev, { role: 'ai', content: '画像サイズは10MB以下にしてください。' }]);
             return;
         }
 
@@ -377,6 +504,7 @@ function AdminDashboard() {
             pages: [""],
             tags: "",
             image_url: "",
+            category: getCategoryFromGenerationAttribute(selectedAttribute),
         });
         setEditorTab("edit");
         setCurrentEditorPageIndex(0);
@@ -397,12 +525,13 @@ function AdminDashboard() {
             const url = "/api/admin/articles";
             const method = isEditing ? "PUT" : "POST";
 
-            const payload: any = {
+            const payload: Record<string, unknown> = {
                 title: editForm.title,
                 excerpt: editForm.excerpt,
                 content: editForm.pages.join('<!-- PAGE_BREAK -->'),
                 tags: editForm.tags.split(",").map((t) => t.trim()).filter(Boolean),
                 image_url: editForm.image_url,
+                category: editForm.category,
             };
 
             if (isEditing) {
@@ -485,7 +614,7 @@ function AdminDashboard() {
                             disabled={saving}
                             className="rounded-full bg-zinc-100 px-5 py-2 text-sm font-semibold text-zinc-700 transition-colors hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700 disabled:opacity-50"
                         >
-                            {saving ? "保存中..." : editingArticleId ? "上書き保存" : "下書き保存"}
+                            {saving ? "保存中..." : editingArticleId ? "下書きを更新" : "下書きを保存"}
                         </button>
                         {!editingArticleId && (
                             <button
@@ -589,12 +718,12 @@ function AdminDashboard() {
                             />
 
                             {editForm.image_url && (
-                                <div className="w-full overflow-hidden rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 aspect-video">
-                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img
+                                <div className="w-full overflow-hidden rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 aspect-video relative">
+                                    <Image
                                         src={editForm.image_url}
                                         alt="カバー画像"
-                                        className="h-full w-full object-cover"
+                                        fill
+                                        className="object-cover"
                                         onError={(e) => (e.currentTarget.style.display = 'none')}
                                     />
                                 </div>
@@ -616,9 +745,20 @@ function AdminDashboard() {
 
                         {/* Tags & Excerpt Input */}
                         <div className="space-y-4 rounded-xl bg-zinc-50 p-5 dark:bg-zinc-900/50">
+                            <div className="flex items-center gap-3">
+                                <span className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500 dark:text-zinc-400">Category</span>
+                                <select
+                                    value={editForm.category}
+                                    onChange={(e) => setEditForm({ ...editForm, category: e.target.value as ArticleCategory })}
+                                    className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-700 outline-none transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+                                >
+                                    <option value="game">ゲーム</option>
+                                    <option value="ai">AI</option>
+                                </select>
+                            </div>
                             <input
                                 type="text"
-                                placeholder="タグ（カンマ区切り: ゲーム, Switch, レビュー）"
+                                placeholder="タグをカンマ区切りで入力: ゲーム, Switch, レビュー"
                                 value={editForm.tags}
                                 onChange={(e) => setEditForm({ ...editForm, tags: e.target.value })}
                                 className="w-full bg-transparent text-sm text-zinc-700 outline-none placeholder:text-zinc-400 dark:text-zinc-300"
@@ -627,7 +767,7 @@ function AdminDashboard() {
                             <textarea
                                 value={editForm.excerpt}
                                 onChange={(e) => setEditForm({ ...editForm, excerpt: e.target.value })}
-                                placeholder="記事の要約・リード文（SNSなどで表示されます）"
+                                placeholder="記事の要約を入力してください。一覧やSNSで表示されます。"
                                 rows={2}
                                 className="w-full resize-none bg-transparent text-sm leading-relaxed text-zinc-600 outline-none placeholder:text-zinc-400 dark:text-zinc-400"
                             />
@@ -708,7 +848,7 @@ function AdminDashboard() {
                                             newPages[currentEditorPageIndex] = e.target.value;
                                             setEditForm({ ...editForm, pages: newPages });
                                         }}
-                                        placeholder={`ページ ${currentEditorPageIndex + 1} の本文を入力してください... (HTML使用可能)`}
+                                        placeholder={`ページ ${currentEditorPageIndex + 1} の本文を入力してください... (HTML対応 / Xの投稿URLを単独行で貼ると埋め込み表示)`}
                                         className="min-h-[50vh] w-full resize-y bg-transparent p-6 text-base leading-loose text-zinc-800 outline-none placeholder:text-zinc-300 dark:text-zinc-200 dark:placeholder:text-zinc-700"
                                     />
                                 ) : (
@@ -742,7 +882,7 @@ function AdminDashboard() {
                                                 dangerouslySetInnerHTML={{ __html: editForm.pages[currentEditorPageIndex] }}
                                             />
                                         ) : (
-                                            <p className="text-zinc-400 dark:text-zinc-600">本文がありません。編集タブで記事を書いてください。</p>
+                                            <p className="text-zinc-400 dark:text-zinc-600">本文がまだありません。編集タブで記事を書いてください。</p>
                                         )}
                                     </div>
                                 )}
@@ -776,10 +916,12 @@ function AdminDashboard() {
                         <div className="flex-1 overflow-y-auto space-y-4 pr-2 mb-4 scrollbar-thin scrollbar-thumb-zinc-300 dark:scrollbar-thumb-zinc-700">
                             {chatMessages.length === 0 ? (
                                 <div className="text-center text-sm text-zinc-400 dark:text-zinc-500 mt-10">
-                                    <p>「箇条書きにして」</p>
-                                    <p>「もっとワクワクする表現にして」</p>
-                                    <p>など、HTMLの修正を会話で指示できます。</p>
-                                    <p className="mt-2 text-xs text-zinc-300 dark:text-zinc-600">📎 画像を添付して分析もできます</p>
+                                    <p>編集内容を自然文で指示できます。</p>
+                                    <p>「最新情報を調べて」「出典付きで整理して」にも対応します。</p>
+                                    <p>構成変更、言い回し調整、見出し追加にも対応します。</p>
+                                    <p>複数ページの記事でもまとめて提案できます。</p>
+                                    <p>内容を確認してから「適用する」で本文へ反映します。</p>
+                                    <p className="mt-2 text-xs text-zinc-300 dark:text-zinc-600">画像を添付して指示することもできます。</p>
                                 </div>
                             ) : (
                                 chatMessages.map((msg, i) => (
@@ -790,14 +932,44 @@ function AdminDashboard() {
                                         <div className="flex flex-col gap-2 max-w-[85%]">
                                             {/* Image preview for user messages */}
                                             {msg.imagePreview && (
-                                                <div className={`overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-700 ${msg.role === 'user' ? 'self-end' : 'self-start'}`}>
-                                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                    <img src={msg.imagePreview} alt="添付画像" className="max-w-[200px] max-h-[150px] object-cover" />
+                                                <div className={`relative w-[200px] h-[150px] overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-700 ${msg.role === 'user' ? 'self-end' : 'self-start'}`}>
+                                                    <Image src={msg.imagePreview} alt="添付画像" fill className="object-cover" />
                                                 </div>
                                             )}
                                             <div className={`px-4 py-2.5 rounded-2xl text-sm ${msg.role === 'user' ? 'bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200 rounded-tr-sm' : 'bg-orange-50 text-orange-900 dark:bg-orange-500/10 dark:text-orange-100 rounded-tl-sm border border-orange-100 dark:border-orange-500/20'}`}>
                                                 <span style={{ whiteSpace: 'pre-wrap' }}>{msg.content}</span>
                                             </div>
+                                            {msg.role === 'ai' && msg.assistantAction && msg.assistantAction !== 'edit' && (
+                                                <div className="self-start inline-flex rounded-full bg-sky-500/10 px-2.5 py-1 text-[10px] font-semibold text-sky-600 dark:text-sky-300">
+                                                    {msg.assistantAction === 'research' ? 'リサーチ結果' : 'リサーチ付き提案'}
+                                                </div>
+                                            )}
+                                            {msg.role === 'ai' && msg.sources && msg.sources.length > 0 && (
+                                                <div className="self-start w-full space-y-2">
+                                                    <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Sources</p>
+                                                    <div className="space-y-2">
+                                                        {msg.sources.map((source, sourceIndex) => (
+                                                            <a
+                                                                key={`${source.uri}-${sourceIndex}`}
+                                                                href={source.uri}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="flex items-start gap-2 rounded-xl border border-zinc-200 bg-white/80 px-3 py-2 transition-colors hover:border-orange-300 hover:bg-orange-50 dark:border-zinc-700 dark:bg-zinc-900/50 dark:hover:border-orange-500/40"
+                                                            >
+                                                                <div className="min-w-0 flex-1">
+                                                                    <p className="truncate text-[10px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+                                                                        {source.domain || `Source ${sourceIndex + 1}`}
+                                                                    </p>
+                                                                    <p className="text-xs text-zinc-700 dark:text-zinc-200">
+                                                                        {source.title}
+                                                                    </p>
+                                                                </div>
+                                                                <ExternalLink className="mt-0.5 h-3.5 w-3.5 shrink-0 text-zinc-400" />
+                                                            </a>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
                                             {/* Apply button for AI confirmation messages */}
                                             {msg.role === 'ai' && msg.showApplyButton && (
                                                 <button
@@ -834,9 +1006,10 @@ function AdminDashboard() {
                             {/* Pending Image Preview */}
                             {pendingImage && (
                                 <div className="mb-2 flex items-center gap-2 rounded-lg bg-zinc-100 p-2 dark:bg-zinc-800">
-                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img src={pendingImage.preview} alt="添付画像" className="h-12 w-12 rounded-md object-cover" />
-                                    <span className="flex-1 text-xs text-zinc-500 dark:text-zinc-400 truncate">画像が添付されました</span>
+                                    <div className="relative h-12 w-12 shrink-0">
+                                        <Image src={pendingImage.preview} alt="添付画像" fill className="rounded-md object-cover" />
+                                    </div>
+                                    <span className="flex-1 truncate text-xs text-zinc-500 dark:text-zinc-400">画像を添付済みです</span>
                                     <button
                                         type="button"
                                         onClick={() => setPendingImage(null)}
@@ -856,7 +1029,7 @@ function AdminDashboard() {
                                             handleAssistantSubmit();
                                         }
                                     }}
-                                    placeholder="修正内容を指示... (Shift+Enterで改行)"
+                                    placeholder="修正内容や調べたい内容を指示... (Shift+Enterで改行)"
                                     rows={3}
                                     className="w-full resize-none bg-zinc-100 rounded-xl pl-10 pr-12 py-3 text-sm outline-none transition-colors border-2 border-transparent focus:border-orange-500 dark:bg-zinc-900/50 dark:text-white dark:border-zinc-800 dark:focus:border-orange-500"
                                     disabled={isAssistantTyping}
@@ -914,7 +1087,7 @@ function AdminDashboard() {
                             <CreditCard className="h-4 w-4" />
                         </div>
                         <div>
-                            <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">今月の推定AIコスト</p>
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">AIコスト</p>
                             <p className="text-sm font-bold text-zinc-700 dark:text-zinc-200">
                                 ${costData.totalUsd.toFixed(2)} <span className="ml-1 text-xs font-medium text-zinc-400">({costData.totalJpy.toLocaleString()}円)</span>
                             </p>
@@ -933,16 +1106,17 @@ function AdminDashboard() {
                     </button>
                     <select
                         value={selectedAttribute}
-                        onChange={(e) => setSelectedAttribute(e.target.value as "game_news" | "game_intro")}
+                        onChange={(e) => setSelectedAttribute(e.target.value as ArticleGenerationAttribute)}
                         disabled={isGenerating}
                         className="rounded-full border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 outline-none transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 focus:ring-2 focus:ring-indigo-500/20 disabled:opacity-50"
                     >
-                        <option value="game_news">ゲームニュース</option>
-                        <option value="game_intro">ゲーム紹介</option>
+                        {ARTICLE_GENERATION_OPTIONS.map((option) => (
+                            <option key={option.value} value={option.value}>{option.label}</option>
+                        ))}
                     </select>
                     <input
                         type="text"
-                        placeholder="キーワード (任意)"
+                        placeholder={selectedGenerationOption.keywordPlaceholder}
                         value={generateKeyword}
                         onChange={(e) => setGenerateKeyword(e.target.value)}
                         disabled={isGenerating}
@@ -953,7 +1127,7 @@ function AdminDashboard() {
                         disabled={isGenerating}
                         className="flex items-center gap-2 rounded-full bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-transform hover:scale-105 disabled:opacity-50 dark:bg-indigo-500"
                     >
-                        🤖 自動生成を実行
+                        AI自動生成を実行
                     </button>
                     <button
                         onClick={openEditorForNew}
@@ -970,7 +1144,7 @@ function AdminDashboard() {
                 <div className="mb-6 rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
                     <div className="mb-2 flex items-center justify-between">
                         <span className="text-sm font-bold text-zinc-900 dark:text-white">
-                            {progressStatus === 'completed' ? '✅ 生成完了' : progressStatus === 'error' ? '❌ エラー発生' : '🤖 AI記事生成中'}
+                            {progressStatus === "completed" ? "生成完了" : progressStatus === "error" ? "生成エラー" : "AI記事生成中"}
                         </span>
                         <span className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
                             {progress}%
@@ -983,10 +1157,10 @@ function AdminDashboard() {
                             style={{ width: `${progress}%` }}
                         />
                     </div>
-                    {generateMessage && (
+                    {visibleGenerateMessage && (
                         <p className={`mt-2 text-xs font-medium ${progressStatus === 'error' ? 'text-red-500' : 'text-zinc-500 dark:text-zinc-400'
                             }`}>
-                            {generateMessage}
+                            {visibleGenerateMessage}
                         </p>
                     )}
                 </div>
@@ -997,13 +1171,6 @@ function AdminDashboard() {
                     {error}
                 </div>
             )}
-            {generateMessage && (
-                <div className="mb-4 rounded-lg bg-blue-50 px-4 py-3 text-sm text-blue-700 dark:bg-blue-900/20 dark:text-blue-300 flex items-start gap-2 border border-blue-100 dark:border-blue-900/30">
-                    <div className="mt-0.5 animate-pulse">🤖</div>
-                    <div>{generateMessage}</div>
-                </div>
-            )}
-
             {/* Tabs & Sort */}
             <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div className="flex items-center gap-4 flex-wrap w-full sm:w-auto">
@@ -1040,7 +1207,7 @@ function AdminDashboard() {
                 </div>
 
                 <div className="flex items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400 self-end sm:self-auto">
-                    <label htmlFor="sort-select" className="font-medium">並び替え:</label>
+                    <label htmlFor="sort-select" className="font-medium">並び替え</label>
                     <select
                         id="sort-select"
                         value={sortBy}
@@ -1048,7 +1215,7 @@ function AdminDashboard() {
                         className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 outline-none transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700 focus:ring-2 focus:ring-orange-500/20"
                     >
                         <option value="date">新しい順</option>
-                        <option value="views">閲覧数が多い順</option>
+                        <option value="views">閲覧数順</option>
                     </select>
                 </div>
             </div>
@@ -1082,9 +1249,12 @@ function AdminDashboard() {
                             </div>
 
                             <div className="min-w-0 flex-1 cursor-pointer" onClick={() => openEditorForEdit(article)}>
-                                <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100 transition-colors group-hover:text-orange-500">
-                                    {article.title}
-                                </h3>
+                                <div className="mb-2 flex flex-wrap items-center gap-2">
+                                    <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold ${article.category === "ai" ? "bg-cyan-500/15 text-cyan-600 dark:text-cyan-300" : "bg-orange-500/15 text-orange-600 dark:text-orange-300"}`}>{article.category === "ai" ? "AI" : "ゲーム"}</span>
+                                    <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100 transition-colors group-hover:text-orange-500">
+                                        {article.title}
+                                    </h3>
+                                </div>
                                 <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400 line-clamp-2 leading-relaxed">
                                     {article.excerpt || "本文なし"}
                                 </p>
@@ -1135,7 +1305,7 @@ function AdminDashboard() {
                                         className="flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs font-semibold text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
                                     >
                                         <X className="h-3.5 w-3.5" />
-                                        非公開にする
+                                        下書きに戻す
                                     </button>
                                 )}
                                 <button
@@ -1159,7 +1329,7 @@ function AdminDashboard() {
                             {activeTab === "draft" ? "下書きがありません" : "公開済みの記事がありません"}
                         </h3>
                         <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                            「記事を書く」ボタンから新しい記事を作成しましょう
+                            「記事を書く」ボタンから新しい記事を作成しましょう。
                         </p>
                     </div>
                 )}
@@ -1175,3 +1345,4 @@ export default function AdminPage() {
         </Suspense>
     );
 }
+

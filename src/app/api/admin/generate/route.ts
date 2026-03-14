@@ -1,17 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { exec } from 'child_process';
-import path from 'path';
+﻿import { spawn } from 'child_process';
 import fs from 'fs';
+import path from 'path';
+import { NextRequest, NextResponse } from 'next/server';
+import { isValidGenerationAttribute } from '@/lib/article-taxonomy';
 
 export async function POST(request: NextRequest) {
-
-    // 2. Extra safety: Check if it's production. Even though middleware blocks it, 
-    // it's good practice to have a defense-in-depth approach for this specific background execution.
     if (process.env.NODE_ENV === 'production') {
         return NextResponse.json({ error: 'Generation is not allowed in production.' }, { status: 403 });
     }
 
-    // 3. Reset progress file
     const cwd = process.cwd();
     const progressFile = path.join(cwd, '.generation-progress.json');
     try {
@@ -19,51 +16,55 @@ export async function POST(request: NextRequest) {
             progress: 0,
             message: '初期化中...',
             status: 'running',
-            timestamp: Date.now()
+            timestamp: Date.now(),
         }));
-    } catch (e) {
-        console.error('[Generate API] Failed to initialize progress file', e);
+    } catch (error) {
+        console.error('[Generate API] Failed to initialize progress file', error);
     }
 
-    // 4. Extract attribute from body and build command
     let attribute = 'game_news';
     let keyword = '';
+
     try {
         const body = await request.json();
-        if (body.attribute) {
+        if (isValidGenerationAttribute(body.attribute)) {
             attribute = body.attribute;
         }
-        if (body.keyword) {
-            keyword = body.keyword;
+        if (typeof body.keyword === 'string') {
+            keyword = body.keyword.trim();
         }
-    } catch (e) {
-        // Ignore JSON parse error if body is empty or malformed
+    } catch {
+        // ignore malformed JSON
     }
 
-    // Using npm run generate which points to tsx scripts/generate-articles.ts
-    // 括弧などのエスケープ処理を考慮して、OSコマンドインジェクションを防ぐための最小限のサニタイズは行いませんが、シェルとして実行されるため二重引用符で囲みます。
-    const command = `npm run generate -- --attribute ${attribute} ${keyword ? `"${keyword.replace(/"/g, '\\"')}"` : ''}`;
+    const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+    const args = ['run', 'generate', '--', '--attribute', attribute];
+    if (keyword) {
+        args.push(keyword);
+    }
 
-    console.log(`[Generate API] Spawned background process: ${command} in ${cwd}`);
+    console.log(`[Generate API] Spawned background process: ${npmCommand} ${args.join(' ')} in ${cwd}`);
 
-    // 5. Execute the script in the background
-    const child = exec(command, { cwd }, (error, stdout, stderr) => {
-        if (error) {
-            console.error(`[Generate API] Error executing script: ${error.message}`);
-            return;
-        }
-        if (stderr) {
-            console.error(`[Generate API] Script stderr: ${stderr}`);
-            // Note: Some scripts write normal warnings to stderr, so we might not want to early return here.
-        }
-        console.log(`[Generate API] Script finished successfully. stdout:\n${stdout}`);
-    });
+    try {
+        const child = spawn(npmCommand, args, {
+            cwd,
+            detached: true,
+            stdio: 'ignore',
+            shell: process.platform === 'win32', // Required for .cmd on Windows
+        });
 
-    // We purposely don't await the child process here and return response immediately 
-    // to prevent Vercel / Next.js API timeouts (usually 10s - 60s max depending on plan/config).
+        child.on('error', (err) => {
+            console.error('[Generate API] Spawn error:', err);
+        });
 
-    return NextResponse.json({
-        success: true,
-        message: '記事生成プロセスをバックグラウンドで開始しました。ターミナルのログを確認してください。完了まで数分かかる場合があります。'
-    });
+        child.unref();
+
+        return NextResponse.json({
+            success: true,
+            message: '記事生成をバックグラウンドで開始しました。ターミナルログと進捗表示で状況を確認できます。',
+        });
+    } catch (error) {
+        console.error('[Generate API] Failed to spawn process:', error);
+        return NextResponse.json({ error: 'バックグラウンドプロセスの開始に失敗しました。' }, { status: 500 });
+    }
 }

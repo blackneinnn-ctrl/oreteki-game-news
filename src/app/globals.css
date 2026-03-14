@@ -445,3 +445,26 @@ html {
     padding: 1rem;
   }
 }
+
+.article-content .x-embed {
+  margin: 2rem 0;
+  overflow: hidden;
+  border-radius: 1rem;
+  background: linear-gradient(180deg, rgba(24, 24, 27, 0.92), rgba(12, 12, 14, 0.98));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 0.5rem;
+}
+
+.article-content .twitter-tweet {
+  margin: 0 auto !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  border-left: none;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+}
+
+.article-content .twitter-tweet-rendered {
+  margin: 0 auto !important;
+}

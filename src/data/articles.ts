@@ -1,7 +1,34 @@
-import { supabase, type Article } from '@/lib/supabase';
+﻿import { supabase, type Article } from '@/lib/supabase';
+import {
+  buildStoredArticleTags,
+  DEFAULT_ARTICLE_CATEGORY,
+  getArticleCategoryFromTags,
+  stripInternalArticleTags,
+  type ArticleCategory,
+} from '@/lib/article-taxonomy';
+import { repairArticleTextFields, repairPossiblyMojibake } from '@/lib/text-repair';
 
-// 公開済み記事を全件取得（新しい順）
-export async function getPublishedArticles(): Promise<Article[]> {
+type ArticleRecord = Omit<Article, 'category' | 'tags'> & {
+  tags: string[] | null;
+};
+
+function normalizeArticle(article: ArticleRecord): Article {
+  return repairArticleTextFields({
+    ...article,
+    category: getArticleCategoryFromTags(article.tags),
+    tags: stripInternalArticleTags(article.tags),
+  });
+}
+
+function filterArticlesByCategory(
+  articles: Article[],
+  category?: ArticleCategory,
+): Article[] {
+  if (!category) return articles;
+  return articles.filter((article) => article.category === category);
+}
+
+export async function getPublishedArticles(category?: ArticleCategory): Promise<Article[]> {
   const { data, error } = await supabase
     .from('articles')
     .select('*')
@@ -12,10 +39,11 @@ export async function getPublishedArticles(): Promise<Article[]> {
     console.error('Error fetching articles:', error);
     return [];
   }
-  return data ?? [];
+
+  const articles = (data ?? []).map((article) => normalizeArticle(article as ArticleRecord));
+  return filterArticlesByCategory(articles, category);
 }
 
-// スラグから記事を取得
 export async function getArticleBySlug(slug: string): Promise<Article | null> {
   const { data, error } = await supabase
     .from('articles')
@@ -24,14 +52,16 @@ export async function getArticleBySlug(slug: string): Promise<Article | null> {
     .eq('status', 'published')
     .single();
 
-  if (error) {
-    console.error('Error fetching article:', error);
+  if (error || !data) {
+    if (error) {
+      console.error('Error fetching article:', error);
+    }
     return null;
   }
-  return data;
+
+  return normalizeArticle(data as ArticleRecord);
 }
 
-// IDから記事を取得（プレビュー用などステータス問わず）
 export async function getArticleById(id: string): Promise<Article | null> {
   const { data, error } = await supabase
     .from('articles')
@@ -39,47 +69,41 @@ export async function getArticleById(id: string): Promise<Article | null> {
     .eq('id', id)
     .single();
 
-  if (error) {
-    console.error('Error fetching article by id:', error);
+  if (error || !data) {
+    if (error) {
+      console.error('Error fetching article by id:', error);
+    }
     return null;
   }
-  return data;
+
+  return normalizeArticle(data as ArticleRecord);
 }
 
-// 人気記事を取得（閲覧数順）
-export async function getPopularArticles(limit: number = 5): Promise<Article[]> {
+export async function getPopularArticles(
+  limit: number = 5,
+  category?: ArticleCategory,
+): Promise<Article[]> {
   const { data, error } = await supabase
     .from('articles')
     .select('*')
     .eq('status', 'published')
-    .order('views', { ascending: false })
-    .limit(limit);
+    .order('views', { ascending: false });
 
   if (error) {
     console.error('Error fetching popular articles:', error);
     return [];
   }
-  return data ?? [];
+
+  const articles = (data ?? []).map((article) => normalizeArticle(article as ArticleRecord));
+  return filterArticlesByCategory(articles, category).slice(0, limit);
 }
 
-// 注目記事を取得（最新3件）
-export async function getFeaturedArticles(): Promise<Article[]> {
-  const { data, error } = await supabase
-    .from('articles')
-    .select('*')
-    .eq('status', 'published')
-    .order('published_at', { ascending: false })
-    .limit(3);
-
-  if (error) {
-    console.error('Error fetching featured articles:', error);
-    return [];
-  }
-  return data ?? [];
+export async function getFeaturedArticles(category?: ArticleCategory): Promise<Article[]> {
+  const articles = await getPublishedArticles(category);
+  return articles.slice(0, 3);
 }
 
-// 全記事を取得（管理画面用）
-export async function getAllArticles(): Promise<Article[]> {
+export async function getAllArticles(category?: ArticleCategory): Promise<Article[]> {
   const { data, error } = await supabase
     .from('articles')
     .select('*')
@@ -89,10 +113,11 @@ export async function getAllArticles(): Promise<Article[]> {
     console.error('Error fetching all articles:', error);
     return [];
   }
-  return data ?? [];
+
+  const articles = (data ?? []).map((article) => normalizeArticle(article as ArticleRecord));
+  return filterArticlesByCategory(articles, category);
 }
 
-// 記事のステータスを更新
 export async function updateArticleStatus(id: string, status: 'draft' | 'published'): Promise<boolean> {
   const updateData: Record<string, unknown> = { status };
   if (status === 'published') {
@@ -111,7 +136,6 @@ export async function updateArticleStatus(id: string, status: 'draft' | 'publish
   return true;
 }
 
-// 記事を削除
 export async function deleteArticle(id: string): Promise<boolean> {
   const { error } = await supabase
     .from('articles')
@@ -125,7 +149,6 @@ export async function deleteArticle(id: string): Promise<boolean> {
   return true;
 }
 
-// 複数記事を一括削除
 export async function deleteArticles(ids: string[]): Promise<boolean> {
   if (!ids.length) return true;
 
@@ -141,17 +164,33 @@ export async function deleteArticles(ids: string[]): Promise<boolean> {
   return true;
 }
 
-// 記事を編集
 export async function updateArticle(id: string, updates: {
   title?: string;
   excerpt?: string;
   content?: string;
   tags?: string[];
   image_url?: string;
+  category?: ArticleCategory;
 }): Promise<boolean> {
+  const payload: Record<string, unknown> = {};
+  if (updates.excerpt !== undefined) payload.excerpt = repairPossiblyMojibake(updates.excerpt);
+  if (updates.content !== undefined) payload.content = repairPossiblyMojibake(updates.content);
+  if (updates.title !== undefined) payload.title = repairPossiblyMojibake(updates.title);
+  if (updates.image_url !== undefined) payload.image_url = updates.image_url;
+
+  if (updates.tags !== undefined || updates.category !== undefined) {
+    const currentArticle = await getArticleById(id);
+    if (!currentArticle) return false;
+
+    payload.tags = buildStoredArticleTags(
+      updates.tags ?? currentArticle.tags,
+      updates.category ?? currentArticle.category,
+    );
+  }
+
   const { error } = await supabase
     .from('articles')
-    .update(updates)
+    .update(payload)
     .eq('id', id);
 
   if (error) {
@@ -161,7 +200,6 @@ export async function updateArticle(id: string, updates: {
   return true;
 }
 
-// 新規記事を作成
 export async function createArticle(article: {
   title: string;
   excerpt?: string;
@@ -169,18 +207,27 @@ export async function createArticle(article: {
   tags?: string[];
   image_url?: string;
   status?: 'draft' | 'published';
+  category?: ArticleCategory;
 }): Promise<{ success: boolean; id?: string }> {
   const slug = `article-${Date.now()}`;
+  const category = article.category ?? DEFAULT_ARTICLE_CATEGORY;
+  const imageUrl = article.image_url?.trim();
+
+  if (!imageUrl) {
+    console.error('Error creating article: image_url is required');
+    return { success: false };
+  }
+
   const { data, error } = await supabase
     .from('articles')
     .insert({
-      title: article.title,
+      title: repairPossiblyMojibake(article.title),
       slug: slug,
-      excerpt: article.excerpt || '',
-      content: article.content,
-      tags: article.tags || [],
-      image_url: article.image_url || `https://picsum.photos/seed/${Date.now()}/1200/630`,
-      author: '管理人',
+      excerpt: repairPossiblyMojibake(article.excerpt || ''),
+      content: repairPossiblyMojibake(article.content),
+      tags: buildStoredArticleTags(article.tags, category),
+      image_url: imageUrl,
+      author: 'AI Editor',
       status: article.status || 'draft',
       views: 0,
     })
@@ -194,45 +241,24 @@ export async function createArticle(article: {
   return { success: true, id: data?.id };
 }
 
-// 関連記事を取得（同じタグを持つ記事、なければ最新記事）
 export async function getRelatedArticles(
   currentId: string,
   tags: string[],
-  limit: number = 4
+  category: ArticleCategory,
+  limit: number = 4,
 ): Promise<Article[]> {
-  // First try to find articles with overlapping tags
-  if (tags.length > 0) {
-    const { data, error } = await supabase
-      .from('articles')
-      .select('*')
-      .eq('status', 'published')
-      .neq('id', currentId)
-      .overlaps('tags', tags)
-      .order('published_at', { ascending: false })
-      .limit(limit);
+  const relatedPool = (await getPublishedArticles(category)).filter((article) => article.id !== currentId);
 
-    if (!error && data && data.length > 0) {
-      return data;
+  if (tags.length > 0) {
+    const tagMatched = relatedPool.filter((article) => article.tags.some((tag) => tags.includes(tag)));
+    if (tagMatched.length > 0) {
+      return tagMatched.slice(0, limit);
     }
   }
 
-  // Fallback: latest articles excluding current
-  const { data, error } = await supabase
-    .from('articles')
-    .select('*')
-    .eq('status', 'published')
-    .neq('id', currentId)
-    .order('published_at', { ascending: false })
-    .limit(limit);
-
-  if (error) {
-    console.error('Error fetching related articles:', error);
-    return [];
-  }
-  return data ?? [];
+  return relatedPool.slice(0, limit);
 }
 
-// 閲覧数を増やす
 export async function incrementViews(id: string): Promise<void> {
   await supabase.rpc('increment_views', { article_id: id });
 }

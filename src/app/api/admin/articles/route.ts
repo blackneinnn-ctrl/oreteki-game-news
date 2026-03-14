@@ -1,17 +1,15 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getAllArticles, updateArticleStatus, deleteArticle, deleteArticles, updateArticle, createArticle } from '@/data/articles';
+﻿import { NextRequest, NextResponse } from 'next/server';
+import { createArticle, deleteArticle, deleteArticles, getAllArticles, updateArticle, updateArticleStatus } from '@/data/articles';
+import { parseArticleCategory } from '@/lib/article-taxonomy';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(request: NextRequest) {
-
+export async function GET() {
     const articles = await getAllArticles();
     return NextResponse.json(articles);
 }
 
-// ステータス変更
 export async function PATCH(request: NextRequest) {
-
     const { id, status } = await request.json();
     if (!id || !['draft', 'published'].includes(status)) {
         return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
@@ -25,10 +23,8 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ success: true });
 }
 
-// 記事の内容を編集
 export async function PUT(request: NextRequest) {
-
-    const { id, title, excerpt, content, tags, image_url } = await request.json();
+    const { id, title, excerpt, content, tags, image_url, category } = await request.json();
     if (!id) {
         return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
     }
@@ -39,6 +35,7 @@ export async function PUT(request: NextRequest) {
     if (content !== undefined) updates.content = content;
     if (tags !== undefined) updates.tags = tags;
     if (image_url !== undefined) updates.image_url = image_url;
+    if (category !== undefined) updates.category = parseArticleCategory(category);
 
     const success = await updateArticle(id, updates);
     if (!success) {
@@ -48,21 +45,23 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ success: true });
 }
 
-// 新規記事を作成
 export async function POST(request: NextRequest) {
-
-    const { title, excerpt, content, tags, image_url, status } = await request.json();
+    const { title, excerpt, content, tags, image_url, status, category } = await request.json();
     if (!title || !content) {
         return NextResponse.json({ error: 'Title and content are required' }, { status: 400 });
+    }
+    if (!image_url?.trim()) {
+        return NextResponse.json({ error: 'Image URL is required' }, { status: 400 });
     }
 
     const result = await createArticle({
         title,
         excerpt: excerpt || '',
-        content: content,
+        content,
         tags: tags || [],
-        image_url: image_url || `https://picsum.photos/seed/${Date.now()}/1200/630`,
+        image_url,
         status: status || 'draft',
+        category: parseArticleCategory(category),
     });
 
     if (!result.success) {
@@ -73,7 +72,6 @@ export async function POST(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-
     const { id, ids } = await request.json();
 
     if (ids && Array.isArray(ids)) {

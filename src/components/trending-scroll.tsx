@@ -1,10 +1,17 @@
+﻿import Image from "next/image";
 import Link from "next/link";
-import Image from "next/image";
 import { TrendingUp } from "lucide-react";
 import { getPopularArticles } from "@/data/articles";
+import { ARTICLE_CATEGORY_CONFIG, type ArticleCategory } from "@/lib/article-taxonomy";
 
-export async function TrendingScroll() {
-    const trending = await getPopularArticles(8);
+interface TrendingScrollProps {
+    category?: ArticleCategory;
+}
+
+export async function TrendingScroll({ category }: TrendingScrollProps) {
+    const resolvedCategory = category ?? "game";
+    const trending = await getPopularArticles(8, resolvedCategory);
+    const categoryConfig = ARTICLE_CATEGORY_CONFIG[resolvedCategory];
 
     if (trending.length === 0) return null;
 
@@ -12,9 +19,9 @@ export async function TrendingScroll() {
         <section className="bg-zinc-950/50 py-8">
             <div className="mx-auto max-w-[1920px] px-4 sm:px-6 lg:px-12 xl:px-16">
                 <div className="mb-4 flex items-center gap-2">
-                    <TrendingUp className="h-5 w-5 text-orange-400" />
+                    <TrendingUp className={`h-5 w-5 ${resolvedCategory === "ai" ? "text-cyan-300" : "text-orange-400"}`} />
                     <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">
-                        トレンド
+                        {categoryConfig.label} Trending
                     </h2>
                 </div>
 
@@ -36,6 +43,9 @@ export async function TrendingScroll() {
                                 <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
                             </div>
                             <div className="flex flex-1 flex-col p-3">
+                                <div className={`mb-2 inline-flex w-fit rounded-full px-2 py-1 text-[10px] font-semibold ${categoryConfig.chipClassName}`}>
+                                    {categoryConfig.label}
+                                </div>
                                 <h3 className="line-clamp-2 text-sm font-bold leading-snug text-zinc-200 transition-colors group-hover:text-orange-400">
                                     {article.title}
                                 </h3>

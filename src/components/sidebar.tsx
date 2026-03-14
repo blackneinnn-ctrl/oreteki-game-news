@@ -1,16 +1,24 @@
-import Link from "next/link";
-import { Flame, TrendingUp } from "lucide-react";
+﻿import Link from "next/link";
+import Image from "next/image";
+import { Flame } from "lucide-react";
 import { getPopularArticles } from "@/data/articles";
+import { ARTICLE_CATEGORY_CONFIG, type ArticleCategory } from "@/lib/article-taxonomy";
 
-export async function Sidebar() {
-    const popular = await getPopularArticles(5);
+interface SidebarProps {
+    category?: ArticleCategory;
+}
+
+export async function Sidebar({ category }: SidebarProps) {
+    const resolvedCategory = category ?? "game";
+    const popular = await getPopularArticles(5, resolvedCategory);
+    const categoryConfig = ARTICLE_CATEGORY_CONFIG[resolvedCategory];
 
     return (
         <aside className="space-y-8">
             <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-                <div className="flex items-center gap-2 border-b border-zinc-200 bg-gradient-to-r from-orange-500 to-red-500 px-5 py-3 dark:border-zinc-800">
+                <div className={`flex items-center gap-2 border-b border-zinc-200 bg-gradient-to-r px-5 py-3 dark:border-zinc-800 ${categoryConfig.accentFrom} ${categoryConfig.accentTo}`}>
                     <Flame className="h-4 w-4 shrink-0 text-white" />
-                    <div className="text-sm font-bold text-white whitespace-nowrap">人気記事ランキング</div>
+                    <div className="whitespace-nowrap text-sm font-bold text-white">人気記事ランキング</div>
                 </div>
                 <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
                     {popular.map((article, index) => (
@@ -43,7 +51,7 @@ export async function Sidebar() {
                 {popular.length > 0 && (
                     <div className="border-t border-zinc-100 dark:border-zinc-800">
                         <Link
-                            href="/ranking"
+                            href={categoryConfig.rankingHref}
                             className="flex items-center justify-center py-3 text-sm font-medium text-orange-600 transition-colors hover:text-orange-700 dark:text-orange-400 dark:hover:text-orange-300"
                         >
                             ランキングをもっと見る →
@@ -57,19 +65,19 @@ export async function Sidebar() {
                 )}
             </div>
 
-            {/* AD / Affiliate Banner Area */}
-            <div className="flex justify-center mt-8">
+            <div className="mt-8 flex justify-center">
                 <a
                     href="https://amzn.to/4r33xwU"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="block hover:opacity-80 transition-opacity"
+                    className="block transition-opacity hover:opacity-80"
                 >
-                    <img
+                    <Image
                         src="https://m.media-amazon.com/images/I/41ImhhWJdmL._AC_.jpg"
                         alt="Amazon Product"
-                        className="w-full max-w-[250px] object-contain rounded-lg"
-                        loading="lazy"
+                        width={250}
+                        height={250}
+                        className="w-full max-w-[250px] rounded-lg object-contain"
                     />
                 </a>
             </div>

@@ -1,16 +1,18 @@
-import Image from "next/image";
+﻿import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Clock, User, ArrowLeft, Tag, ExternalLink, BookOpen, Sparkles } from "lucide-react";
-import { getArticleBySlug, getPublishedArticles } from "@/data/articles";
-import { Sidebar } from "@/components/sidebar";
-import { ShareButton } from "@/components/share-button";
-import { ViewTracker } from "@/components/view-tracker";
-import { ReadingProgress } from "@/components/reading-progress";
-import { RelatedArticles } from "@/components/related-articles";
+import { ArrowLeft, BookOpen, Clock, ExternalLink, Tag, User } from "lucide-react";
 import type { Metadata } from "next";
+import { getArticleBySlug, getPublishedArticles } from "@/data/articles";
+import { ArticleContent } from "@/components/article-content";
+import { RelatedArticles } from "@/components/related-articles";
+import { ReadingProgress } from "@/components/reading-progress";
+import { ShareButton } from "@/components/share-button";
+import { Sidebar } from "@/components/sidebar";
+import { ViewTracker } from "@/components/view-tracker";
+import { ARTICLE_CATEGORY_CONFIG } from "@/lib/article-taxonomy";
 
-const SITE_NAME = "俺的ゲームニュース";
+const SITE_NAME = "俺的ゲーム・AIニュース";
 
 export const revalidate = 0;
 
@@ -92,9 +94,9 @@ export default async function ArticlePage({
     searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
     const { slug } = await params;
-    const searchParamsResolved = await searchParams;
+    const resolvedSearchParams = await searchParams;
 
-    const pageParam = searchParamsResolved.page;
+    const pageParam = resolvedSearchParams.page;
     const currentPage = typeof pageParam === "string" ? Math.max(1, parseInt(pageParam, 10) || 1) : 1;
 
     const article = await getArticleBySlug(slug);
@@ -103,17 +105,15 @@ export default async function ArticlePage({
         notFound();
     }
 
+    const categoryConfig = ARTICLE_CATEGORY_CONFIG[article.category];
     const date = new Date(article.published_at ?? article.created_at).toLocaleDateString("ja-JP");
-
     const pages = article.content ? article.content.split("<!-- PAGE_BREAK -->") : [""];
     const totalPages = pages.length;
     const validPageIndex = Math.min(Math.max(0, currentPage - 1), totalPages - 1);
     const pageContent = pages[validPageIndex] || "";
-
     const readingTime = estimateReadingTime(article.content || "");
     const sectionHeadings = extractSectionHeadings(article.content || "");
     const highlights = [article.excerpt, ...sectionHeadings].filter((text) => text.trim().length > 0).slice(0, 4);
-
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
     const jsonLd = {
@@ -123,6 +123,7 @@ export default async function ArticlePage({
         description: article.excerpt,
         image: article.image_url,
         datePublished: article.published_at ?? article.created_at,
+        articleSection: categoryConfig.label,
         author: {
             "@type": "Person",
             name: article.author,
@@ -157,31 +158,34 @@ export default async function ArticlePage({
                 <div className="absolute inset-0 bg-gradient-to-t from-black via-black/55 to-black/15" />
                 <div className="absolute inset-0 bg-gradient-to-r from-black/45 via-black/15 to-transparent" />
                 <div className="article-hero-noise absolute inset-0" />
-                <div className="pointer-events-none absolute -right-14 top-14 h-52 w-52 rounded-full bg-orange-500/35 blur-3xl" />
-                <div className="pointer-events-none absolute -left-16 bottom-0 h-56 w-56 rounded-full bg-amber-300/20 blur-3xl" />
+                <div className={`pointer-events-none absolute -right-14 top-14 h-52 w-52 rounded-full blur-3xl ${article.category === "ai" ? "bg-cyan-400/30" : "bg-orange-500/35"}`} />
+                <div className={`pointer-events-none absolute -left-16 bottom-0 h-56 w-56 rounded-full blur-3xl ${article.category === "ai" ? "bg-sky-300/20" : "bg-amber-300/20"}`} />
 
                 <Link
-                    href="/"
+                    href={categoryConfig.href}
                     className="absolute left-4 top-4 flex items-center gap-2 rounded-full border border-white/20 bg-black/40 px-4 py-2 text-sm font-medium text-white backdrop-blur-md transition-colors hover:bg-black/60 sm:left-6 sm:top-6"
                 >
                     <ArrowLeft className="h-4 w-4" />
-                    トップへ戻る
+                    {categoryConfig.label}トップへ戻る
                 </Link>
 
                 <div className="absolute bottom-0 left-0 right-0 p-6 sm:p-8 md:p-12">
                     <div className="mx-auto max-w-4xl">
-                        {article.tags.length > 0 && (
-                            <div className="mb-4 flex flex-wrap gap-2">
-                                {article.tags.slice(0, 3).map((tag) => (
-                                    <span
-                                        key={tag}
-                                        className="rounded-full border border-white/20 bg-orange-500/80 px-3 py-1 text-xs font-semibold text-white backdrop-blur-sm"
-                                    >
-                                        {tag}
-                                    </span>
-                                ))}
-                            </div>
-                        )}
+                        <div className="mb-4 flex flex-wrap gap-2">
+                            <span
+                                className={`rounded-full border px-3 py-1 text-xs font-semibold backdrop-blur-sm ${categoryConfig.chipClassName}`}
+                            >
+                                {categoryConfig.label}
+                            </span>
+                            {article.tags.slice(0, 3).map((tag) => (
+                                <span
+                                    key={tag}
+                                    className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold text-white backdrop-blur-sm"
+                                >
+                                    {tag}
+                                </span>
+                            ))}
+                        </div>
                         <h1 className="text-2xl font-extrabold leading-tight text-white sm:text-3xl md:text-5xl md:leading-tight">
                             {article.title}
                         </h1>
@@ -191,10 +195,10 @@ export default async function ArticlePage({
 
             <div className="mx-auto max-w-[1920px] px-4 py-8 sm:px-6 sm:py-12 lg:px-12 xl:px-16">
                 <div className="flex flex-col gap-10 md:flex-row md:justify-between lg:gap-16">
-                    <article className="min-w-0 max-w-5xl flex-1">
+                    <article className="max-w-5xl min-w-0 flex-1">
                         <div className="mb-8 flex flex-wrap items-center gap-4 border-b border-zinc-200 pb-6 dark:border-zinc-800">
                             <div className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400">
-                                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-orange-500 to-red-500 text-white">
+                                <div className={`flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br text-white ${categoryConfig.accentFrom} ${categoryConfig.accentTo}`}>
                                     <User className="h-4 w-4" />
                                 </div>
                                 <span className="font-medium">{article.author}</span>
@@ -205,7 +209,7 @@ export default async function ArticlePage({
                             </div>
                             <div className="flex items-center gap-1.5 text-sm text-zinc-500 dark:text-zinc-400">
                                 <BookOpen className="h-4 w-4" />
-                                <span>約{readingTime}分で読めます</span>
+                                <span>{readingTime}分で読めます</span>
                             </div>
                             <ShareButton
                                 url={`${siteUrl}/articles/${slug}`}
@@ -229,7 +233,7 @@ export default async function ArticlePage({
                                     {highlights.length > 0 && (
                                         <div className="article-cinematic-in article-cinematic-in--delay rounded-2xl border border-amber-400/20 bg-amber-500/10 p-5 sm:p-6">
                                             <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-amber-200">
-                                                <Sparkles className="h-4 w-4" />
+                                                <Tag className="h-4 w-4" />
                                                 この記事の見どころ
                                             </div>
                                             <ul className="article-highlight-list text-sm text-zinc-100">
@@ -241,9 +245,9 @@ export default async function ArticlePage({
                                     )}
                                 </div>
 
-                                <div
+                                <ArticleContent
+                                    html={pageContent}
                                     className="article-content text-white"
-                                    dangerouslySetInnerHTML={{ __html: pageContent }}
                                 />
                             </div>
                         </section>
@@ -329,12 +333,12 @@ export default async function ArticlePage({
                             </div>
                         </div>
 
-                        <RelatedArticles currentId={article.id} tags={article.tags} />
+                        <RelatedArticles currentId={article.id} tags={article.tags} category={article.category} />
                     </article>
 
                     <div className="w-full shrink-0 md:w-72 lg:w-80">
                         <div className="md:sticky md:top-24">
-                            <Sidebar />
+                            <Sidebar category={article.category} />
                         </div>
                     </div>
                 </div>

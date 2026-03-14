@@ -9,7 +9,7 @@ export async function GET() {
         if (!fs.existsSync(progressFile)) {
             return NextResponse.json({
                 progress: 0,
-                message: '待機中',
+                message: '',
                 status: 'idle',
                 timestamp: Date.now()
             });
@@ -23,7 +23,7 @@ export async function GET() {
         console.error('[Progress API] Error reading progress file:', e);
         return NextResponse.json({
             progress: 0,
-            message: '進捗の取得に失敗しました',
+            message: '進捗の取得に失敗しました。',
             status: 'error',
             timestamp: Date.now()
         }, { status: 500 });

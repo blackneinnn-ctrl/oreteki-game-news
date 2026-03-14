@@ -1,15 +1,17 @@
+﻿import Image from "next/image";
 import Link from "next/link";
-import Image from "next/image";
 import { Clock, Sparkles } from "lucide-react";
 import { getRelatedArticles } from "@/data/articles";
+import type { ArticleCategory } from "@/lib/article-taxonomy";
 
 interface RelatedArticlesProps {
     currentId: string;
     tags: string[];
+    category: ArticleCategory;
 }
 
-export async function RelatedArticles({ currentId, tags }: RelatedArticlesProps) {
-    const related = await getRelatedArticles(currentId, tags, 4);
+export async function RelatedArticles({ currentId, tags, category }: RelatedArticlesProps) {
+    const related = await getRelatedArticles(currentId, tags, category, 4);
 
     if (related.length === 0) return null;
 

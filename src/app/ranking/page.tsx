@@ -1,39 +1,49 @@
+﻿import Image from "next/image";
 import Link from "next/link";
-import Image from "next/image";
-import { Trophy, Clock, ArrowLeft } from "lucide-react";
-import { getPopularArticles } from "@/data/articles";
+import { ArrowLeft, Clock, Trophy } from "lucide-react";
 import type { Metadata } from "next";
+import { getPopularArticles } from "@/data/articles";
+import { ARTICLE_CATEGORY_CONFIG, parseArticleCategory } from "@/lib/article-taxonomy";
+import { CategoryTabs } from "@/components/category-tabs";
 
 export const revalidate = 60;
 
 export const metadata: Metadata = {
-    title: "閲覧ランキング - 俺的ゲームニュース",
-    description: "俺的ゲームニュースの人気記事ランキング。閲覧数順に記事を表示しています。",
+    title: "人気ランキング",
+    description: "カテゴリごとの人気記事ランキングを確認できます。",
 };
 
-export default async function RankingPage() {
-    const rankedArticles = await getPopularArticles(10);
+export default async function RankingPage({
+    searchParams,
+}: {
+    searchParams: Promise<{ category?: string }>;
+}) {
+    const params = await searchParams;
+    const category = parseArticleCategory(params.category);
+    const categoryConfig = ARTICLE_CATEGORY_CONFIG[category];
+    const rankedArticles = await getPopularArticles(10, category);
 
     return (
         <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6 sm:py-14">
             <div className="mb-8">
+                <CategoryTabs activeCategory={category} />
                 <Link
-                    href="/"
+                    href={categoryConfig.href}
                     className="mb-4 inline-flex items-center gap-2 text-sm font-medium text-zinc-500 transition-colors hover:text-orange-600 dark:text-zinc-400 dark:hover:text-orange-400"
                 >
                     <ArrowLeft className="h-4 w-4" />
-                    トップへ戻る
+                    {categoryConfig.label}トップへ戻る
                 </Link>
                 <div className="flex items-center gap-3">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-500 to-red-500 shadow-lg shadow-orange-500/25">
+                    <div className={`flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br shadow-lg ${categoryConfig.accentFrom} ${categoryConfig.accentTo}`}>
                         <Trophy className="h-6 w-6 text-white" />
                     </div>
                     <div>
                         <h1 className="text-2xl font-extrabold text-zinc-900 dark:text-white sm:text-3xl">
-                            閲覧ランキング
+                            {categoryConfig.label} 人気ランキング
                         </h1>
                         <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                            人気の記事を閲覧数順に表示
+                            閲覧数の多い記事をカテゴリ別に表示しています。
                         </p>
                     </div>
                 </div>
@@ -72,6 +82,9 @@ export default async function RankingPage() {
                         </div>
 
                         <div className="flex min-w-0 flex-1 flex-col justify-center">
+                            <div className={`mb-2 inline-flex w-fit rounded-full px-2 py-1 text-[10px] font-semibold ${categoryConfig.chipClassName}`}>
+                                {categoryConfig.label}
+                            </div>
                             <h2 className="line-clamp-2 text-sm font-bold leading-snug text-zinc-800 transition-colors group-hover:text-orange-600 dark:text-zinc-100 dark:group-hover:text-orange-400 sm:text-base">
                                 {article.title}
                             </h2>
