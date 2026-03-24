@@ -20,6 +20,11 @@ export interface Article {
     tags: string[];
     views: number;
     status: 'draft' | 'published';
+    generation_cost_usd?: number | null;
+    generation_cost_jpy?: number | null;
+    generation_run_id?: string | null;
+    generation_pipeline_version?: string | null;
+    generation_model_summary?: string | null;
     created_at: string;
     published_at: string | null;
 }

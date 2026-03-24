@@ -15,6 +15,11 @@ CREATE TABLE articles (
   tags TEXT[] DEFAULT '{}',
   views INTEGER DEFAULT 0,
   status TEXT DEFAULT 'draft' CHECK (status IN ('draft', 'published')),
+  generation_cost_usd DOUBLE PRECISION,
+  generation_cost_jpy INTEGER,
+  generation_run_id TEXT,
+  generation_pipeline_version TEXT,
+  generation_model_summary TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   published_at TIMESTAMPTZ
 );
@@ -54,7 +59,9 @@ CREATE TABLE api_usage (
   model TEXT NOT NULL,
   input_tokens INTEGER NOT NULL,
   output_tokens INTEGER NOT NULL,
-  operation TEXT NOT NULL
+  operation TEXT NOT NULL,
+  generation_run_id TEXT,
+  pipeline_version TEXT
 );
 
 -- RLS
@@ -69,3 +76,5 @@ CREATE POLICY "Allow insert usage with anon key"
   WITH CHECK (true);
 
 CREATE INDEX idx_api_usage_created_at ON api_usage(created_at DESC);
+CREATE INDEX idx_api_usage_generation_run_id ON api_usage(generation_run_id);
+CREATE INDEX idx_articles_generation_pipeline_version ON articles(generation_pipeline_version, created_at DESC);
